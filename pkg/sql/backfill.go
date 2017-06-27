@@ -32,6 +32,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/sqlbase"
 	"github.com/cockroachdb/cockroach/pkg/util/log"
 	"github.com/cockroachdb/cockroach/pkg/util/timeutil"
+	"github.com/cockroachdb/cockroach/pkg/sql/jobs"
 )
 
 const (
@@ -200,6 +201,7 @@ func (sc *SchemaChanger) maybeWriteResumeSpan(
 	resume roachpb.Span,
 	mutationIdx int,
 	lastCheckpoint *time.Time,
+	*jobs.JobLogger,
 ) error {
 	checkpointInterval := checkpointInterval
 	if sc.testingKnobs.WriteCheckpointInterval > 0 {
@@ -309,7 +311,7 @@ func (sc *SchemaChanger) truncateIndexes(
 				if err != nil {
 					return err
 				}
-				if err := sc.maybeWriteResumeSpan(ctx, txn, version, resume, mutationIdx, &lastCheckpoint); err != nil {
+				if err := sc.maybeWriteResumeSpan(ctx, txn, version, resume, mutationIdx, &lastCheckpoint, sc.jobLogger()); err != nil {
 					return err
 				}
 				done = resume.Key == nil
@@ -494,7 +496,7 @@ func (sc *SchemaChanger) distBackfill(
 			}
 			planCtx := sc.distSQLPlanner.NewPlanningCtx(ctx, txn)
 			plan, err := sc.distSQLPlanner.CreateBackfiller(
-				&planCtx, backfillType, *tableDesc, duration, chunkSize, spans, otherTableDescs,
+				&planCtx, backfillType, *tableDesc, duration, chunkSize, spans, otherTableDescs, *sc.jobLogger.JobID(),
 			)
 			if err != nil {
 				return err

@@ -25,6 +25,7 @@ import (
 
 	"github.com/cockroachdb/cockroach/pkg/internal/client"
 	"github.com/cockroachdb/cockroach/pkg/roachpb"
+	"github.com/cockroachdb/cockroach/pkg/sql/jobs"
 	"github.com/cockroachdb/cockroach/pkg/sql/sqlbase"
 	"github.com/cockroachdb/cockroach/pkg/util/log"
 	"github.com/cockroachdb/cockroach/pkg/util/protoutil"
@@ -141,7 +142,8 @@ func (b *backfiller) mainLoop(ctx context.Context) error {
 		b.spec.Table.ID,
 		work,
 		resume,
-		addedIndexMutationIdx)
+		addedIndexMutationIdx,
+		b.spec)
 }
 
 // WriteResumeSpan writes a checkpoint for the backfill work on origSpan.
@@ -154,7 +156,10 @@ func WriteResumeSpan(
 	origSpan roachpb.Span,
 	resume roachpb.Span,
 	mutationIdx int,
+	spec BackfillerSpec,
 ) error {
+
+	jobLogger := jobs.GetJobLogger(ctx, db, spec.JobID)
 	ctx, traceSpan := tracing.ChildSpan(ctx, "checkpoint")
 	defer tracing.FinishSpan(traceSpan)
 	if resume.Key != nil && !resume.EndKey.Equal(origSpan.EndKey) {
@@ -176,7 +181,7 @@ func WriteResumeSpan(
 		// checkpoint, and replaces origSpan in the checkpoint with
 		// resume.
 		mutation := &tableDesc.Mutations[mutationIdx]
-		for i, sp := range mutation.ResumeSpans {
+		for i, sp :=  {
 			if sp.Key.Compare(origSpan.Key) <= 0 &&
 				sp.EndKey.Compare(origSpan.EndKey) >= 0 {
 				// origSpan is in sp; split sp if needed to accommodate

@@ -386,6 +386,11 @@ message BackfillerSpec {
   // backfiller to do its job, such as the descriptors for tables with fk
   // relationships to the table being modified.
   repeated sqlbase.TableDescriptor other_tables = 6 [(gogoproto.nullable) = false];
+
+  // The job id for a mutation job is the id in the system.jobs table of the
+  // schema change job executing the mutation referenced by mutation_id.
+  optional int64 job_id = 7 [(gogoproto.nullable) = false,
+                            (gogoproto.customname) = "JobID"];
 }
 
 // FlowSpec describes a "flow" which is a subgraph of a distributed SQL
