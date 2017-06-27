@@ -32,6 +32,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/mon"
 	"github.com/cockroachdb/cockroach/pkg/sql/parser"
 	"github.com/cockroachdb/cockroach/pkg/sql/sqlbase"
+	"github.com/cockroachdb/cockroach/pkg/sql/sqlutil"
 	"github.com/cockroachdb/cockroach/pkg/storage/engine"
 	"github.com/cockroachdb/cockroach/pkg/util/envutil"
 	"github.com/cockroachdb/cockroach/pkg/util/log"
@@ -106,6 +107,8 @@ type ServerConfig struct {
 	// NodeID is the id of the node on which this Server is running.
 	NodeID    *base.NodeIDContainer
 	ClusterID uuid.UUID
+
+	InternalExecutor sqlutil.InternalExecutor
 }
 
 // ServerImpl implements the server for the distributed SQL APIs.
@@ -208,6 +211,7 @@ func (ds *ServerImpl) setupFlow(
 	// TODO(radu): we should sanity check some of these fields (especially
 	// txnProto).
 	flowCtx := FlowCtx{
+<<<<<<< HEAD
 		AmbientContext: ds.AmbientContext,
 		stopper:        ds.Stopper,
 		id:             req.Flow.FlowID,
@@ -219,6 +223,18 @@ func (ds *ServerImpl) setupFlow(
 		testingKnobs:   ds.TestingKnobs,
 		nodeID:         nodeID,
 		tempStorage:    ds.tempStorage,
+=======
+		AmbientContext:   ds.AmbientContext,
+		id:               req.Flow.FlowID,
+		evalCtx:          evalCtx,
+		rpcCtx:           ds.RPCContext,
+		txnProto:         &req.Txn,
+		clientDB:         ds.DB,
+		remoteTxnDB:      ds.FlowDB,
+		testingKnobs:     ds.TestingKnobs,
+		nodeID:           nodeID,
+		InternalExecutor: ds.ServerConfig.InternalExecutor,
+>>>>>>> sql/jobs: allow modifying job details
 	}
 
 	ctx = flowCtx.AnnotateCtx(ctx)

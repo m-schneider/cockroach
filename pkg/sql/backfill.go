@@ -32,7 +32,6 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/sqlbase"
 	"github.com/cockroachdb/cockroach/pkg/util/log"
 	"github.com/cockroachdb/cockroach/pkg/util/timeutil"
-	"github.com/cockroachdb/cockroach/pkg/sql/jobs"
 )
 
 const (
@@ -201,7 +200,7 @@ func (sc *SchemaChanger) maybeWriteResumeSpan(
 	resume roachpb.Span,
 	mutationIdx int,
 	lastCheckpoint *time.Time,
-	*jobs.JobLogger,
+	jl *jobs.JobLogger,
 ) error {
 	checkpointInterval := checkpointInterval
 	if sc.testingKnobs.WriteCheckpointInterval > 0 {
@@ -217,10 +216,16 @@ func (sc *SchemaChanger) maybeWriteResumeSpan(
 	if tableDesc.Version != version {
 		return errors.Errorf("table version mismatch: %d, expected: %d", tableDesc.Version, version)
 	}
-	if len(tableDesc.Mutations[mutationIdx].ResumeSpans) > 0 {
-		tableDesc.Mutations[mutationIdx].ResumeSpans[0] = resume
+
+	details, ok := jl.Job.Details.(jobs.SchemaChangeJobDetails)
+	if !ok {
+		return errors.Errorf("wrong type of jobs")
+	}
+
+	if len(details.ResumeSpanList[mutationIdx].ResumeSpans) > 0 {
+		details.ResumeSpanList[mutationIdx].ResumeSpans[0] = resume
 	} else {
-		tableDesc.Mutations[mutationIdx].ResumeSpans = append(tableDesc.Mutations[mutationIdx].ResumeSpans, resume)
+		details.ResumeSpanList[mutationIdx].ResumeSpans = append(details.ResumeSpanList[mutationIdx].ResumeSpans, resume)
 	}
 	if err := txn.SetSystemConfigTrigger(); err != nil {
 		return err
@@ -311,7 +316,7 @@ func (sc *SchemaChanger) truncateIndexes(
 				if err != nil {
 					return err
 				}
-				if err := sc.maybeWriteResumeSpan(ctx, txn, version, resume, mutationIdx, &lastCheckpoint, sc.jobLogger()); err != nil {
+				if err := sc.maybeWriteResumeSpan(ctx, txn, version, resume, mutationIdx, &lastCheckpoint, sc.jobLogger); err != nil {
 					return err
 				}
 				done = resume.Key == nil
@@ -341,10 +346,9 @@ func (sc *SchemaChanger) getMutationToBackfill(
 	version sqlbase.DescriptorVersion,
 	backfillType backfillType,
 	filter distsqlrun.MutationFilter,
-) (*sqlbase.DescriptorMutation, error) {
-	var mutation *sqlbase.DescriptorMutation
+) (int64, error) {
+	var mutationIdx int64
 	err := sc.db.Txn(ctx, func(ctx context.Context, txn *client.Txn) error {
-		mutation = nil
 		tableDesc, err := sqlbase.GetTableDescFromID(ctx, txn, sc.tableID)
 		if err != nil {
 			return err
@@ -359,14 +363,14 @@ func (sc *SchemaChanger) getMutationToBackfill(
 					break
 				}
 				if filter(tableDesc.Mutations[i]) {
-					mutation = &tableDesc.Mutations[i]
+					mutationIdx = int64(i)
 					break
 				}
 			}
 		}
 		return nil
 	})
-	return mutation, err
+	return mutationIdx, err
 }
 
 // nRanges returns the number of ranges that cover a set of spans.
@@ -422,10 +426,10 @@ func (sc *SchemaChanger) distBackfill(
 		if err != nil {
 			return err
 		}
-		if mutation == nil {
+		if mutation == -1 {
 			break
 		}
-		spans := mutation.ResumeSpans
+		spans := sc.jobLogger.Job.Details.(jobs.SchemaChangeJobDetails).ResumeSpanList[mutation].ResumeSpans
 		if len(spans) <= 0 {
 			break
 		}

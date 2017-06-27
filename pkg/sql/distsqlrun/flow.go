@@ -29,6 +29,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/rpc"
 	"github.com/cockroachdb/cockroach/pkg/sql/parser"
 	"github.com/cockroachdb/cockroach/pkg/storage/engine"
+	"github.com/cockroachdb/cockroach/pkg/sql/sqlutil"
 	"github.com/cockroachdb/cockroach/pkg/util/log"
 	"github.com/cockroachdb/cockroach/pkg/util/stop"
 	"github.com/cockroachdb/cockroach/pkg/util/uuid"
@@ -76,6 +77,8 @@ type FlowCtx struct {
 	// tempStorage is used by some DistSQL processors to store Rows when the
 	// working set is larger than can be stored in memory.
 	tempStorage engine.Engine
+
+	InternalExecutor sqlutil.InternalExecutor
 }
 
 func (flowCtx *FlowCtx) setupTxn() *client.Txn {

@@ -50,11 +50,12 @@ func newIndexBackfiller(
 ) (*indexBackfiller, error) {
 	ib := &indexBackfiller{
 		backfiller: backfiller{
-			name:    "Index",
-			filter:  IndexMutationFilter,
-			flowCtx: flowCtx,
-			output:  output,
-			spec:    spec,
+			name:             "Index",
+			filter:           IndexMutationFilter,
+			flowCtx:          flowCtx,
+			output:           output,
+			spec:             spec,
+			internalExecutor: flowCtx.InternalExecutor,
 		},
 	}
 	ib.backfiller.chunkBackfiller = ib

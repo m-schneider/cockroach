@@ -677,7 +677,7 @@ func (sc *SchemaChanger) reverseMutations(ctx context.Context, causingError erro
 				// mutation ID we're looking for.
 				break
 			}
-			desc.Mutations[i].ResumeSpans = nil
+			sc.jobLogger.Job.Details.(jobs.SchemaChangeJobDetails).ResumeSpanList[i].ResumeSpans = nil
 			log.Warningf(ctx, "reverse schema change mutation: %+v", mutation)
 			switch mutation.Direction {
 			case sqlbase.DescriptorMutation_ADD:

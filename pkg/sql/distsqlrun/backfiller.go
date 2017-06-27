@@ -27,6 +27,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/roachpb"
 	"github.com/cockroachdb/cockroach/pkg/sql/jobs"
 	"github.com/cockroachdb/cockroach/pkg/sql/sqlbase"
+	"github.com/cockroachdb/cockroach/pkg/sql/sqlutil"
 	"github.com/cockroachdb/cockroach/pkg/util/log"
 	"github.com/cockroachdb/cockroach/pkg/util/protoutil"
 	"github.com/cockroachdb/cockroach/pkg/util/timeutil"
@@ -63,6 +64,7 @@ type backfiller struct {
 	flowCtx *FlowCtx
 	fetcher sqlbase.RowFetcher
 	alloc   sqlbase.DatumAlloc
+	internalExecutor sqlutil.InternalExecutor
 }
 
 // Run is part of the processor interface.
@@ -143,7 +145,8 @@ func (b *backfiller) mainLoop(ctx context.Context) error {
 		work,
 		resume,
 		addedIndexMutationIdx,
-		b.spec)
+		b.spec,
+		b.internalExecutor)
 }
 
 // WriteResumeSpan writes a checkpoint for the backfill work on origSpan.
@@ -157,9 +160,9 @@ func WriteResumeSpan(
 	resume roachpb.Span,
 	mutationIdx int,
 	spec BackfillerSpec,
+	internalExecutor sqlutil.InternalExecutor,
 ) error {
-
-	jobLogger := jobs.GetJobLogger(ctx, db, spec.JobID)
+	jobLogger, _ := jobs.GetJobLogger(ctx, db, internalExecutor, spec.JobID)
 	ctx, traceSpan := tracing.ChildSpan(ctx, "checkpoint")
 	defer tracing.FinishSpan(traceSpan)
 	if resume.Key != nil && !resume.EndKey.Equal(origSpan.EndKey) {
@@ -180,48 +183,58 @@ func WriteResumeSpan(
 		// origSpan. It then carves a spot for origSpan in the
 		// checkpoint, and replaces origSpan in the checkpoint with
 		// resume.
-		mutation := &tableDesc.Mutations[mutationIdx]
-		for i, sp :=  {
-			if sp.Key.Compare(origSpan.Key) <= 0 &&
-				sp.EndKey.Compare(origSpan.EndKey) >= 0 {
-				// origSpan is in sp; split sp if needed to accommodate
-				// origSpan and replace origSpan with resume.
-				before := mutation.ResumeSpans[:i]
-				after := append([]roachpb.Span{}, mutation.ResumeSpans[i+1:]...)
+		//mutation := &tableDesc.Mutations[mutationIdx]
+		switch jobLogger.Job.Details.(type) {
+		case jobs.SchemaChangeJobDetails:
+			details := jobLogger.Job.Details.(jobs.SchemaChangeJobDetails)
+			mutation := details.ResumeSpanList[mutationIdx]
+			for i, sp := range mutation.ResumeSpans {
+				if sp.Key.Compare(origSpan.Key) <= 0 &&
+					sp.EndKey.Compare(origSpan.EndKey) >= 0 {
+					// origSpan is in sp; split sp if needed to accommodate
+					// origSpan and replace origSpan with resume.
+					before := mutation.ResumeSpans[:i]
+					after := append([]roachpb.Span{}, mutation.ResumeSpans[i+1:]...)
 
-				// add span to before, but merge it with the last span
-				// if possible.
-				addSpan := func(begin, end roachpb.Key) {
-					if begin.Equal(end) {
-						return
+					// add span to before, but merge it with the last span
+					// if possible.
+					addSpan := func(begin, end roachpb.Key) {
+						if begin.Equal(end) {
+							return
+						}
+						if len(before) > 0 && before[len(before)-1].EndKey.Equal(begin) {
+							before[len(before)-1].EndKey = end
+						} else {
+							before = append(before, roachpb.Span{Key: begin, EndKey: end})
+						}
 					}
-					if len(before) > 0 && before[len(before)-1].EndKey.Equal(begin) {
-						before[len(before)-1].EndKey = end
+
+					// The work done = [origSpan.Key...resume.Key]
+					addSpan(sp.Key, origSpan.Key)
+					if resume.Key != nil {
+						addSpan(resume.Key, resume.EndKey)
 					} else {
-						before = append(before, roachpb.Span{Key: begin, EndKey: end})
+						log.VEventf(ctx, 2, "completed processing of span: %+v", origSpan)
 					}
-				}
+					addSpan(origSpan.EndKey, sp.EndKey)
+					mutation.ResumeSpans = append(before, after...)
 
-				// The work done = [origSpan.Key...resume.Key]
-				addSpan(sp.Key, origSpan.Key)
-				if resume.Key != nil {
-					addSpan(resume.Key, resume.EndKey)
-				} else {
-					log.VEventf(ctx, 2, "completed processing of span: %+v", origSpan)
+					log.VEventf(ctx, 2, "ckpt %+v", mutation.ResumeSpans)
+					if err := txn.SetSystemConfigTrigger(); err != nil {
+						return err
+					}
+					return txn.Put(ctx, sqlbase.MakeDescMetadataKey(tableDesc.GetID()), sqlbase.WrapDescriptor(tableDesc))
 				}
-				addSpan(origSpan.EndKey, sp.EndKey)
-				mutation.ResumeSpans = append(before, after...)
-
-				log.VEventf(ctx, 2, "ckpt %+v", mutation.ResumeSpans)
-				if err := txn.SetSystemConfigTrigger(); err != nil {
-					return err
-				}
-				return txn.Put(ctx, sqlbase.MakeDescMetadataKey(tableDesc.GetID()), sqlbase.WrapDescriptor(tableDesc))
 			}
+
+			// Unable to find a span containing origSpan?
+			return errors.Errorf(
+				"span %+v not found among %+v", origSpan, mutation.ResumeSpans,
+			)
 		}
 		// Unable to find a span containing origSpan?
 		return errors.Errorf(
-			"span %+v not found among %+v", origSpan, mutation.ResumeSpans,
+			"span %+v not found", origSpan,
 		)
 	})
 }

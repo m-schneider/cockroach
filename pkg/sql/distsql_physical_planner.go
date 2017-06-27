@@ -700,7 +700,7 @@ func initBackfillerSpec(
 		Duration:    duration,
 		ChunkSize:   chunkSize,
 		OtherTables: otherTables,
-		jobId:       jobID,
+		JobID:       jobID,
 	}
 	switch backfillType {
 	case indexBackfill:

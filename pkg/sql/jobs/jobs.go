@@ -153,6 +153,22 @@ func (j *Job) ID() *int64 {
 	return j.id
 }
 
+// setDetails sets the Details field on a JobPayload, making sure that the
+// input details is of a supported type.
+func setDetails(payload *JobPayload, details interface{}) error {
+	switch d := details.(type) {
+	case BackupJobDetails:
+		payload.Details = &JobPayload_Backup{Backup: &d}
+	case RestoreJobDetails:
+		payload.Details = &JobPayload_Restore{Restore: &d}
+	case SchemaChangeJobDetails:
+		payload.Details = &JobPayload_SchemaChange{SchemaChange: &d}
+	default:
+		return errors.Errorf("JobLogger: unsupported job details type %T", d)
+	}
+	return nil
+}
+
 // Created records the creation of a new job in the system.jobs table and
 // remembers the assigned ID of the job in the Job. The job information is read
 // from the Record field at the time Created is called.

@@ -325,6 +325,7 @@ func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
 		ParentMemoryMonitor: &rootSQLMemoryMonitor,
 		Counter:             distSQLMetrics.CurBytesCount,
 		Hist:                distSQLMetrics.MaxBytesHist,
+		InternalExecutor:    sql.InternalExecutor{LeaseManager: s.leaseMgr},
 	}
 	if s.cfg.TestingKnobs.DistSQL != nil {
 		distSQLCfg.TestingKnobs = *s.cfg.TestingKnobs.DistSQL.(*distsqlrun.TestingKnobs)
