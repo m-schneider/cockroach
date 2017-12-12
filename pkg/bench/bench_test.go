@@ -258,15 +258,15 @@ func runBenchmarkInsertSecondaryIndex(b *testing.B, db *gosql.DB, count int) {
 func BenchmarkSQL(b *testing.B) {
 	ForEachDB(b, func(b *testing.B, db *gosql.DB) {
 		for _, runFn := range []func(*testing.B, *gosql.DB, int){
-			runBenchmarkDelete,
-			runBenchmarkInsert,
-			runBenchmarkInsertDistinct,
-			runBenchmarkInsertFK,
+			//runBenchmarkDelete,
+			//runBenchmarkInsert,
+			//runBenchmarkInsertDistinct,
+			//runBenchmarkInsertFK,
 			runBenchmarkInsertSecondaryIndex,
-			runBenchmarkInterleavedSelect,
-			runBenchmarkTrackChoices,
-			runBenchmarkUpdate,
-			runBenchmarkUpsert,
+			//runBenchmarkInterleavedSelect,
+			//runBenchmarkTrackChoices,
+			//runBenchmarkUpdate,
+			//runBenchmarkUpsert,
 		} {
 			fnName := runtime.FuncForPC(reflect.ValueOf(runFn).Pointer()).Name()
 			fnName = strings.TrimPrefix(fnName, "github.com/cockroachdb/cockroach/pkg/bench.runBenchmark")

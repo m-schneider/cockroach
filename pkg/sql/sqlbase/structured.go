@@ -1641,6 +1641,12 @@ func columnTypeIsIndexable(t ColumnType) bool {
 	return !MustBeValueEncoded(t.SemanticType)
 }
 
+// columnTypeIsInvertedIndexable returns whether the type t is valid to be indexed
+// using an inverted index.
+func columnTypeIsInvertedIndexable(t ColumnType) bool {
+	return t.SemanticType == ColumnType_JSON
+}
+
 func notIndexableError(cols []ColumnDescriptor) error {
 	if len(cols) == 0 {
 		return nil
@@ -1681,6 +1687,23 @@ func checkColumnsValidForIndex(tableDesc *TableDescriptor, indexColNames []strin
 	return nil
 }
 
+func checkColumnsValidForInvertedIndex(tableDesc *TableDescriptor, indexColNames []string) error {
+	invalidColumns := make([]ColumnDescriptor, 0, len(indexColNames))
+	for _, indexCol := range indexColNames {
+		for _, col := range tableDesc.Columns {
+			if col.Name == indexCol {
+				if !columnTypeIsInvertedIndexable(col.Type) {
+					invalidColumns = append(invalidColumns, col)
+				}
+			}
+		}
+	}
+	if len(invalidColumns) > 0 {
+		return notIndexableError(invalidColumns)
+	}
+	return nil
+}
+
 // AddColumn adds a column to the table.
 func (desc *TableDescriptor) AddColumn(col ColumnDescriptor) {
 	desc.Columns = append(desc.Columns, col)
@@ -1693,23 +1716,33 @@ func (desc *TableDescriptor) AddFamily(fam ColumnFamilyDescriptor) {
 
 // AddIndex adds an index to the table.
 func (desc *TableDescriptor) AddIndex(idx IndexDescriptor, primary bool) error {
-	if err := checkColumnsValidForIndex(desc, idx.ColumnNames); err != nil {
-		return err
-	}
-	if primary {
-		// PrimaryIndex is unset.
-		if desc.PrimaryIndex.Name == "" {
-			if idx.Name == "" {
-				// Only override the index name if it hasn't been set by the user.
-				idx.Name = PrimaryKeyIndexName
-			}
-			desc.PrimaryIndex = idx
-		} else {
-			return fmt.Errorf("multiple primary keys for table %q are not allowed", desc.Name)
+	if idx.Type == IndexDescriptor_FORWARD {
+		if err := checkColumnsValidForIndex(desc, idx.ColumnNames); err != nil {
+			return err
 		}
+
+		if primary {
+			// PrimaryIndex is unset.
+			if desc.PrimaryIndex.Name == "" {
+				if idx.Name == "" {
+					// Only override the index name if it hasn't been set by the user.
+					idx.Name = PrimaryKeyIndexName
+				}
+				desc.PrimaryIndex = idx
+			} else {
+				return fmt.Errorf("multiple primary keys for table %q are not allowed", desc.Name)
+			}
+		} else {
+			desc.Indexes = append(desc.Indexes, idx)
+		}
+
 	} else {
+		if err := checkColumnsValidForInvertedIndex(desc, idx.ColumnNames); err != nil {
+			return err
+		}
 		desc.Indexes = append(desc.Indexes, idx)
 	}
+
 	return nil
 }
 
@@ -2043,8 +2076,14 @@ func (desc *TableDescriptor) AddColumnMutation(
 func (desc *TableDescriptor) AddIndexMutation(
 	idx IndexDescriptor, direction DescriptorMutation_Direction,
 ) error {
-	if err := checkColumnsValidForIndex(desc, idx.ColumnNames); err != nil {
-		return err
+	if idx.Type == IndexDescriptor_FORWARD {
+		if err := checkColumnsValidForIndex(desc, idx.ColumnNames); err != nil {
+			return err
+		}
+	} else {
+		if err := checkColumnsValidForInvertedIndex(desc, idx.ColumnNames); err != nil {
+			return err
+		}
 	}
 	m := DescriptorMutation{Descriptor_: &DescriptorMutation_Index{Index: &idx}, Direction: direction}
 	desc.addMutation(m)
