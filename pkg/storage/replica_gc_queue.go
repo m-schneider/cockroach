@@ -248,7 +248,7 @@ func (rgcq *replicaGCQueue) process(
 }
 
 func (*replicaGCQueue) timer(_ time.Duration) time.Duration {
-	return replicaGCQueueTimerDuration
+	return 0
 }
 
 // purgatoryChan returns nil.

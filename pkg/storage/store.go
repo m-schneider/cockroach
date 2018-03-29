@@ -60,6 +60,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/util/timeutil"
 	"github.com/cockroachdb/cockroach/pkg/util/tracing"
 	"github.com/cockroachdb/cockroach/pkg/util/uuid"
+	"math/rand"
 )
 
 const (
@@ -2828,6 +2829,9 @@ func (s *Store) HandleSnapshot(
 			if err := s.processRaftRequest(ctx, &header.RaftMessageRequest, inSnap); err != nil {
 				return sendSnapError(errors.Wrap(err.GoError(), "failed to apply snapshot"))
 			}
+
+			log.Infof(ctx, "sleeping before sending applied response")
+			time.Sleep(time.Millisecond * time.Duration(rand.Intn(5000)))
 			return stream.Send(&SnapshotResponse{Status: SnapshotResponse_APPLIED})
 		}
 	}
@@ -3321,7 +3325,7 @@ func sendSnapshot(
 	}
 
 	// The size of batches to send. This is the granularity of rate limiting.
-	const batchSize = 256 << 10 // 256 KB
+	const batchSize = 1024 << 10 // 256 KB
 	targetRate, err := snapshotRateLimit(header.Priority)
 	if err != nil {
 		return errors.Wrapf(err, "%s", to)

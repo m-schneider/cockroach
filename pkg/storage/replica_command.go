@@ -3537,10 +3537,12 @@ func (r *Replica) changeReplicas(
 		if err := r.sendSnapshot(ctx, repDesc, snapTypePreemptive, priority); err != nil {
 			return err
 		}
-
 		repDesc.ReplicaID = updatedDesc.NextReplicaID
 		updatedDesc.NextReplicaID++
 		updatedDesc.Replicas = append(updatedDesc.Replicas, repDesc)
+
+		log.Infof(ctx, "sleeping after applying snapshot")
+		time.Sleep(time.Millisecond * time.Duration(rand.Intn(60000)))
 
 	case roachpb.REMOVE_REPLICA:
 		// If that exact node-store combination does not have the replica,
@@ -3582,6 +3584,9 @@ func (r *Replica) changeReplicas(
 			if err := txn.Run(ctx, b); err != nil {
 				return err
 			}
+
+			log.Infof(ctx, "sleeping after updating range descriptor")
+			time.Sleep(time.Millisecond * time.Duration(rand.Intn(30000)))
 		}
 
 		// Log replica change into range event log.
@@ -3613,6 +3618,9 @@ func (r *Replica) changeReplicas(
 			log.Event(ctx, err.Error())
 			return err
 		}
+
+		log.Infof(ctx, "sleeping after updating EndTransactionRequest")
+		time.Sleep(time.Millisecond * time.Duration(rand.Intn(30000)))
 
 		if oldDesc.RangeID != 0 && !reflect.DeepEqual(oldDesc, desc) {
 			// We read the previous value, it wasn't what we supposedly used in

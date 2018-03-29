@@ -52,7 +52,7 @@ const (
 	defaultCGroupMemPath            = "/sys/fs/cgroup/memory/memory.limit_in_bytes"
 	defaultCacheSize                = 512 << 20 // 512 MB
 	defaultSQLMemoryPoolSize        = 512 << 20 // 512 MB
-	defaultScanInterval             = 10 * time.Minute
+	defaultScanInterval             = 10 * time.Second
 	defaultConsistencyCheckInterval = 24 * time.Hour
 	defaultScanMaxIdleTime          = 200 * time.Millisecond
 	defaultMetricsSampleInterval    = 10 * time.Second
