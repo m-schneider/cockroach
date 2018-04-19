@@ -1787,7 +1787,7 @@ func TestTxnCoordSenderHeartbeatFailurePostSplit(t *testing.T) {
 	keyA := roachpb.Key("a")
 	keyB := roachpb.Key("b")
 	signal := make(chan struct{})
-	storeKnobs.TestingRequestFilter = func(ba roachpb.BatchRequest) *roachpb.Error {
+	storeKnobs.TestingRequestFilter = func(ba *roachpb.BatchRequest) *roachpb.Error {
 		for _, req := range ba.Requests {
 			switch r := req.GetInner().(type) {
 			case *roachpb.GetRequest:

@@ -110,7 +110,7 @@ func RunJob(
 // related to bulk IO/backup/restore/import: Export, Import and AddSSTable. See
 // discussion on RunJob for where this might be useful.
 func BulkOpResponseFilter(allowProgressIota *chan struct{}) storagebase.ReplicaResponseFilter {
-	return func(ba roachpb.BatchRequest, br *roachpb.BatchResponse) *roachpb.Error {
+	return func(ba *roachpb.BatchRequest, br *roachpb.BatchResponse) *roachpb.Error {
 		for _, res := range br.Responses {
 			if res.Export != nil || res.Import != nil || res.AddSstable != nil {
 				<-*allowProgressIota

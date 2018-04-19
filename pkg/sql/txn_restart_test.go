@@ -763,7 +763,7 @@ func assureTxnAborted(t *testing.T, s serverutils.TestServerInterface, txn *roac
 	}
 	push.PusherTxn.Priority = roachpb.MaxTxnPriority
 	abortBa.Add(push)
-	if _, pErr := s.DistSender().Send(context.Background(), abortBa); pErr != nil {
+	if _, pErr := s.DistSender().Send(context.Background(), &abortBa); pErr != nil {
 		t.Fatalf("failed to abort transaction: %v", pErr)
 	}
 }
@@ -1323,7 +1323,7 @@ func TestReacquireLeaseOnRestart(t *testing.T) {
 			TestingEvalFilter: cmdFilters.RunFilters,
 		},
 		DisableMaxOffsetCheck: true,
-		ClockBeforeSend: func(c *hlc.Clock, ba roachpb.BatchRequest) {
+		ClockBeforeSend: func(c *hlc.Clock, ba *roachpb.BatchRequest) {
 			if atomic.LoadInt32(&clockUpdate) > 0 {
 				return
 			}

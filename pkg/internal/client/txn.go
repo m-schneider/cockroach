@@ -668,7 +668,7 @@ func (txn *Txn) sendEndTxnReq(
 	}
 	var ba roachpb.BatchRequest
 	ba.Add(endTxnReq(commit, deadline, txn.systemConfigTrigger))
-	_, pErr := txn.Send(ctx, ba)
+	_, pErr := txn.Send(ctx, &ba)
 	return pErr
 }
 
@@ -846,8 +846,9 @@ func (txn *Txn) isRetryableErrMeantForTxnLocked(retryErr roachpb.HandledRetryabl
 // always commit or clean-up explicitly even when that may not be
 // required (or even erroneous). Returns (nil, nil) for an empty batch.
 func (txn *Txn) Send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba1 *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
+	ba := *ba1
 	// It doesn't make sense to use inconsistent reads in a transaction. However,
 	// we still need to accept it as a parameter for this to compile.
 	if ba.ReadConsistency != roachpb.CONSISTENT {
@@ -869,7 +870,7 @@ func (txn *Txn) Send(
 		return nil, nil
 	}
 
-	firstWriteIdx, pErr := firstWriteIndex(ba)
+	firstWriteIdx, pErr := firstWriteIndex(&ba)
 	if pErr != nil {
 		return nil, pErr
 	}
@@ -956,7 +957,7 @@ func (txn *Txn) Send(
 
 	// Send call through the DB.
 	requestTxnID := ba.Txn.ID
-	br, pErr := txn.db.sendUsingSender(ctx, ba, sender)
+	br, pErr := txn.db.sendUsingSender(ctx, &ba, sender)
 
 	// Lock for the entire response postlude.
 	txn.mu.Lock()
@@ -1067,7 +1068,7 @@ func (txn *Txn) Send(
 // BatchRequest. Returns -1 if the batch has not intention to write. It also
 // verifies that if an EndTransactionRequest is included, then it is the last
 // request in the batch.
-func firstWriteIndex(ba roachpb.BatchRequest) (int, *roachpb.Error) {
+func firstWriteIndex(ba *roachpb.BatchRequest) (int, *roachpb.Error) {
 	for i, ru := range ba.Requests {
 		args := ru.GetInner()
 		if i < len(ba.Requests)-1 /* if not last*/ {

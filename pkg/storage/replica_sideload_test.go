@@ -643,7 +643,7 @@ func TestRaftSSTableSideloadingProposal(t *testing.T) {
 		ba.Add(&get)
 		ba.Header.RangeID = tc.repl.RangeID
 
-		br, pErr := tc.store.Send(ctx, ba)
+		br, pErr := tc.store.Send(ctx, &ba)
 		if pErr != nil {
 			t.Fatal(pErr)
 		}
@@ -738,7 +738,7 @@ func TestRaftSSTableSideloadingSnapshot(t *testing.T) {
 		addReq.EndKey = addReq.Key.Next()
 		ba.Add(&addReq)
 
-		_, pErr := tc.store.Send(ctx, ba)
+		_, pErr := tc.store.Send(ctx, &ba)
 		if pErr != nil {
 			t.Fatal(pErr)
 		}

@@ -330,7 +330,7 @@ func (f *fkBatchChecker) runCheck(
 	}
 	defer f.reset()
 
-	br, err := f.txn.Send(ctx, f.batch)
+	br, err := f.txn.Send(ctx, &f.batch)
 	if err != nil {
 		return err.GoError()
 	}

@@ -164,11 +164,11 @@ func TestComplexScenarios(t *testing.T) {
 				_ SendOptions,
 				_ *rpc.Context,
 				replicas ReplicaSlice,
-				args roachpb.BatchRequest,
+				args *roachpb.BatchRequest,
 			) (Transport, error) {
 				return &firstNErrorTransport{
 					replicas:  replicas,
-					args:      args,
+					args:      *args,
 					numErrors: test.numErrors,
 				}, nil
 			},
@@ -273,5 +273,5 @@ func sendBatch(
 			TransportFactory: transportFactory,
 		},
 	}, nil)
-	return ds.sendToReplicas(ctx, SendOptions{metrics: &ds.metrics}, 0, makeReplicas(addrs...), roachpb.BatchRequest{}, rpcContext)
+	return ds.sendToReplicas(ctx, SendOptions{metrics: &ds.metrics}, 0, makeReplicas(addrs...), &roachpb.BatchRequest{}, rpcContext)
 }

@@ -798,7 +798,7 @@ func TestReadConsistencyTypes(t *testing.T) {
 			// Mock out DistSender's sender function to check the read consistency for
 			// outgoing BatchRequests and return an empty reply.
 			factory := client.TxnSenderFactoryFunc(func(_ client.TxnType) client.TxnSender {
-				return client.TxnSenderFunc(func(_ context.Context, ba roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+				return client.TxnSenderFunc(func(_ context.Context, ba *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 					if ba.ReadConsistency != rc {
 						return nil, roachpb.NewErrorf("BatchRequest has unexpected ReadConsistency %s", ba.ReadConsistency)
 					}
@@ -971,7 +971,7 @@ func TestNodeIDAndObservedTimestamps(t *testing.T) {
 	// Mock out sender function to check that created transactions
 	// have the observed timestamp set for the configured node ID.
 	factory := client.TxnSenderFactoryFunc(func(_ client.TxnType) client.TxnSender {
-		return client.TxnSenderFunc(func(_ context.Context, ba roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+		return client.TxnSenderFunc(func(_ context.Context, ba *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 			return ba.CreateReply(), nil
 		})
 	})

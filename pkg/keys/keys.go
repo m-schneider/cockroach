@@ -796,7 +796,7 @@ func EnsureSafeSplitKey(key roachpb.Key) (roachpb.Key, error) {
 
 // Range returns a key range encompassing the key ranges of all requests in the
 // Batch.
-func Range(ba roachpb.BatchRequest) (roachpb.RSpan, error) {
+func Range(ba *roachpb.BatchRequest) (roachpb.RSpan, error) {
 	from := roachpb.RKeyMax
 	to := roachpb.RKeyMin
 	for _, arg := range ba.Requests {

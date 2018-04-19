@@ -307,7 +307,7 @@ func (p *pendingLeaseRequest) requestLeaseAsync(
 				ba.Timestamp = p.repl.store.Clock().Now()
 				ba.RangeID = p.repl.RangeID
 				ba.Add(leaseReq)
-				_, pErr = p.repl.Send(ctx, ba)
+				_, pErr = p.repl.Send(ctx, &ba)
 			}
 			// We reset our state below regardless of whether we've gotten an error or
 			// not, but note that an error is ambiguous - there's no guarantee that the

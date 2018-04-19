@@ -33,7 +33,7 @@ var emptySpan = roachpb.Span{}
 // rs = [a,bb],
 //
 // then truncate(ba,rs) returns a batch (Put[a], Put[b]) and positions [0,2].
-func truncate(ba roachpb.BatchRequest, rs roachpb.RSpan) (roachpb.BatchRequest, []int, error) {
+func truncate(ba *roachpb.BatchRequest, rs roachpb.RSpan) (*roachpb.BatchRequest, []int, error) {
 	truncateOne := func(args roachpb.Request) (bool, roachpb.Span, error) {
 		header := args.Header()
 		if !roachpb.IsRange(args) {
@@ -100,7 +100,7 @@ func truncate(ba roachpb.BatchRequest, rs roachpb.RSpan) (roachpb.BatchRequest, 
 	// slice, only when something changed (copy-on-write).
 
 	var positions []int
-	truncBA := ba
+	truncBA := *ba
 	truncBA.Requests = nil
 	for pos, arg := range ba.Requests {
 		hasRequest, newHeader, err := truncateOne(arg.GetInner())
@@ -118,10 +118,10 @@ func truncate(ba roachpb.BatchRequest, rs roachpb.RSpan) (roachpb.BatchRequest, 
 			positions = append(positions, pos)
 		}
 		if err != nil {
-			return roachpb.BatchRequest{}, nil, err
+			return &roachpb.BatchRequest{}, nil, err
 		}
 	}
-	return truncBA, positions, nil
+	return &truncBA, positions, nil
 }
 
 // prev gives the right boundary of the union of all requests which don't
@@ -135,7 +135,7 @@ func truncate(ba roachpb.BatchRequest, rs roachpb.RSpan) (roachpb.BatchRequest, 
 //
 // TODO(tschottdorf): again, better on BatchRequest itself, but can't pull
 // 'keys' into 'roachpb'.
-func prev(ba roachpb.BatchRequest, k roachpb.RKey) (roachpb.RKey, error) {
+func prev(ba *roachpb.BatchRequest, k roachpb.RKey) (roachpb.RKey, error) {
 	candidate := roachpb.RKeyMin
 	for _, union := range ba.Requests {
 		inner := union.GetInner()
@@ -206,7 +206,7 @@ func prev(ba roachpb.BatchRequest, k roachpb.RKey) (roachpb.RKey, error) {
 //
 // TODO(tschottdorf): again, better on BatchRequest itself, but can't pull
 // 'keys' into 'proto'.
-func next(ba roachpb.BatchRequest, k roachpb.RKey) (roachpb.RKey, error) {
+func next(ba *roachpb.BatchRequest, k roachpb.RKey) (roachpb.RKey, error) {
 	candidate := roachpb.RKeyMax
 	for _, union := range ba.Requests {
 		inner := union.GetInner()

@@ -1851,7 +1851,7 @@ func (r *Replica) maybeInitializeRaftGroup(ctx context.Context) {
 // read-only, read-write, or admin execution path as appropriate.
 // ctx should contain the log tags from the store (and up).
 func (r *Replica) Send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	var br *roachpb.BatchResponse
 	if r.leaseholderStats != nil && ba.Header.GatewayNodeID != 0 {
@@ -1970,7 +1970,7 @@ func (r *Replica) requestCanProceed(rspan roachpb.RSpan, ts hlc.Timestamp) error
 // read-only, or none.
 // TODO(tschottdorf): should check that request is contained in range
 // and that EndTransaction only occurs at the very end.
-func (r *Replica) checkBatchRequest(ba roachpb.BatchRequest, isReadOnly bool) error {
+func (r *Replica) checkBatchRequest(ba *roachpb.BatchRequest, isReadOnly bool) error {
 	consistent := ba.ReadConsistency == roachpb.CONSISTENT
 	if isReadOnly {
 		if !consistent && ba.Txn != nil {
@@ -2403,7 +2403,7 @@ func (r *Replica) applyTimestampCache(
 // Admin commands must run on the lease holder replica. Batch support here is
 // limited to single-element batches; everything else catches an error.
 func (r *Replica) executeAdminBatch(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	if len(ba.Requests) != 1 {
 		return nil, roachpb.NewErrorf("only single-element admin batches allowed")
@@ -2550,7 +2550,7 @@ func (r *Replica) limitTxnMaxTimestamp(
 // overlapping writes currently processing through Raft ahead of us to
 // clear via the command queue.
 func (r *Replica) executeReadOnlyBatch(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (br *roachpb.BatchResponse, pErr *roachpb.Error) {
 	// If the read is not inconsistent, the read requires the range lease.
 	var status LeaseStatus
@@ -2559,9 +2559,9 @@ func (r *Replica) executeReadOnlyBatch(
 			return nil, pErr
 		}
 	}
-	r.limitTxnMaxTimestamp(ctx, &ba, status)
+	r.limitTxnMaxTimestamp(ctx, ba, status)
 
-	spans, err := collectSpans(*r.Desc(), &ba)
+	spans, err := collectSpans(*r.Desc(), ba)
 	if err != nil {
 		return nil, roachpb.NewError(err)
 	}
@@ -2569,7 +2569,7 @@ func (r *Replica) executeReadOnlyBatch(
 	// Add the read to the command queue to gate subsequent
 	// overlapping commands until this command completes.
 	log.Event(ctx, "command queue")
-	endCmds, err := r.beginCmds(ctx, &ba, spans)
+	endCmds, err := r.beginCmds(ctx, ba, spans)
 	if err != nil {
 		return nil, roachpb.NewError(err)
 	}
@@ -2645,7 +2645,7 @@ func (r *Replica) executeReadOnlyBatch(
 // due to the Raft proposal failing retryably, possibly due to proposal
 // reordering or re-proposals.
 func (r *Replica) executeWriteBatch(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	var ambiguousResult bool
 	for count := 0; ; count++ {
@@ -2722,7 +2722,7 @@ func (r *Replica) executeWriteBatch(
 // as this method makes the assumption that it operates on a shallow copy (see
 // call to applyTimestampCache).
 func (r *Replica) tryExecuteWriteBatch(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (br *roachpb.BatchResponse, pErr *roachpb.Error, retry proposalRetryReason) {
 	startTime := timeutil.Now()
 
@@ -2730,7 +2730,7 @@ func (r *Replica) tryExecuteWriteBatch(
 		return nil, roachpb.NewError(err), proposalNoRetry
 	}
 
-	spans, err := collectSpans(*r.Desc(), &ba)
+	spans, err := collectSpans(*r.Desc(), ba)
 	if err != nil {
 		return nil, roachpb.NewError(err), proposalNoRetry
 	}
@@ -2744,7 +2744,7 @@ func (r *Replica) tryExecuteWriteBatch(
 		// been run to successful completion.
 		log.Event(ctx, "command queue")
 		var err error
-		endCmds, err = r.beginCmds(ctx, &ba, spans)
+		endCmds, err = r.beginCmds(ctx, ba, spans)
 		if err != nil {
 			return nil, roachpb.NewError(err), proposalNoRetry
 		}
@@ -2771,13 +2771,13 @@ func (r *Replica) tryExecuteWriteBatch(
 		}
 		lease = status.Lease
 	}
-	r.limitTxnMaxTimestamp(ctx, &ba, status)
+	r.limitTxnMaxTimestamp(ctx, ba, status)
 
 	// Examine the read and write timestamp caches for preceding
 	// commands which require this command to move its timestamp
 	// forward. Or, in the case of a transactional write, the txn
 	// timestamp and possible write-too-old bool.
-	if bumped, pErr := r.applyTimestampCache(ctx, &ba); pErr != nil {
+	if bumped, pErr := r.applyTimestampCache(ctx, ba); pErr != nil {
 		return nil, pErr, proposalNoRetry
 	} else if bumped {
 		// If we bump the transaction's timestamp, we must absolutely
@@ -2891,7 +2891,7 @@ func (r *Replica) tryExecuteWriteBatch(
 func (r *Replica) requestToProposal(
 	ctx context.Context,
 	idKey storagebase.CmdIDKey,
-	ba roachpb.BatchRequest,
+	ba *roachpb.BatchRequest,
 	endCmds *endCmds,
 	spans *spanset.SpanSet,
 ) (*ProposalData, *roachpb.Error) {
@@ -2904,7 +2904,7 @@ func (r *Replica) requestToProposal(
 		endCmds: endCmds,
 		doneCh:  make(chan proposalResult, 1),
 		Local:   &res.Local,
-		Request: &ba,
+		Request: ba,
 	}
 
 	if needConsensus {
@@ -2915,7 +2915,7 @@ func (r *Replica) requestToProposal(
 		if r.store.TestingKnobs().EvalKnobs.TestingEvalFilter != nil {
 			// For backwards compatibility, tests that use TestingEvalFilter
 			// need the original request to be preserved. See #10493
-			proposal.command.TestingBatchRequest = &ba
+			proposal.command.TestingBatchRequest = ba
 		}
 	}
 
@@ -2936,7 +2936,7 @@ func (r *Replica) requestToProposal(
 //
 // Replica.mu must not be held.
 func (r *Replica) evaluateProposal(
-	ctx context.Context, idKey storagebase.CmdIDKey, ba roachpb.BatchRequest, spans *spanset.SpanSet,
+	ctx context.Context, idKey storagebase.CmdIDKey, ba *roachpb.BatchRequest, spans *spanset.SpanSet,
 ) (*result.Result, bool, *roachpb.Error) {
 	if ba.Timestamp == (hlc.Timestamp{}) {
 		return nil, false, roachpb.NewErrorf("can't propose Raft command with zero timestamp")
@@ -3121,7 +3121,7 @@ func makeIDKey() storagebase.CmdIDKey {
 func (r *Replica) propose(
 	ctx context.Context,
 	lease roachpb.Lease,
-	ba roachpb.BatchRequest,
+	ba *roachpb.BatchRequest,
 	endCmds *endCmds,
 	spans *spanset.SpanSet,
 ) (chan proposalResult, func() bool, func(), *roachpb.Error) {
@@ -3245,7 +3245,7 @@ func (r *Replica) propose(
 			Ctx:   ctx,
 			Cmd:   *proposal.command,
 			CmdID: idKey,
-			Req:   ba,
+			Req:   *ba,
 		}
 		if pErr := filter(filterArgs); pErr != nil {
 			delete(r.mu.proposals, idKey)
@@ -5257,7 +5257,7 @@ func checkIfTxnAborted(
 // re-executed in full. This allows it to lay down intents and return
 // an appropriate retryable error.
 func (r *Replica) evaluateWriteBatch(
-	ctx context.Context, idKey storagebase.CmdIDKey, ba roachpb.BatchRequest, spans *spanset.SpanSet,
+	ctx context.Context, idKey storagebase.CmdIDKey, ba *roachpb.BatchRequest, spans *spanset.SpanSet,
 ) (engine.Batch, enginepb.MVCCStats, *roachpb.BatchResponse, result.Result, *roachpb.Error) {
 	ms := enginepb.MVCCStats{}
 	// If not transactional or there are indications that the batch's txn will
@@ -5268,7 +5268,7 @@ func (r *Replica) evaluateWriteBatch(
 
 		// Try executing with transaction stripped. We use the transaction timestamp
 		// to write any values as it may have been advanced by the timestamp cache.
-		strippedBa := ba
+		strippedBa := *ba
 		strippedBa.Timestamp = strippedBa.Txn.Timestamp
 		strippedBa.Txn = nil
 		strippedBa.Requests = ba.Requests[1 : len(ba.Requests)-1] // strip begin/end txn reqs
@@ -5281,7 +5281,7 @@ func (r *Replica) evaluateWriteBatch(
 		// If all writes occurred at the intended timestamp, we've succeeded on the fast path.
 		rec := NewReplicaEvalContext(r, spans)
 		batch, br, res, pErr := r.evaluateWriteBatchWithLocalRetries(
-			ctx, idKey, rec, &ms, strippedBa, spans, retryLocally,
+			ctx, idKey, rec, &ms, &strippedBa, spans, retryLocally,
 		)
 		if pErr == nil && (ba.Timestamp == br.Timestamp ||
 			(retryLocally && !isEndTransactionExceedingDeadline(br.Timestamp, *etArg))) {
@@ -5349,7 +5349,7 @@ func (r *Replica) evaluateWriteBatchWithLocalRetries(
 	idKey storagebase.CmdIDKey,
 	rec batcheval.EvalContext,
 	ms *enginepb.MVCCStats,
-	ba roachpb.BatchRequest,
+	ba *roachpb.BatchRequest,
 	spans *spanset.SpanSet,
 	canRetry bool,
 ) (batch engine.Batch, br *roachpb.BatchResponse, res result.Result, pErr *roachpb.Error) {
@@ -5384,7 +5384,7 @@ func (r *Replica) evaluateWriteBatchWithLocalRetries(
 // serializable and the commit timestamp has been forwarded, or (3) the
 // transaction exceeded its deadline, or (4) the testing knobs disallow optional
 // one phase commits and the BatchRequest does not require one phase commit.
-func isOnePhaseCommit(ba roachpb.BatchRequest, knobs *StoreTestingKnobs) bool {
+func isOnePhaseCommit(ba *roachpb.BatchRequest, knobs *StoreTestingKnobs) bool {
 	if ba.Txn == nil {
 		return false
 	}
@@ -5526,7 +5526,7 @@ func evaluateBatch(
 	batch engine.ReadWriter,
 	rec batcheval.EvalContext,
 	ms *enginepb.MVCCStats,
-	ba roachpb.BatchRequest,
+	ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, result.Result, *roachpb.Error) {
 	br := ba.CreateReply()
 
@@ -5898,7 +5898,7 @@ func (r *Replica) MaybeGossipNodeLiveness(ctx context.Context, span roachpb.Span
 	// Call evaluateBatch instead of Send to avoid command queue reentrance.
 	rec := NewReplicaEvalContext(r, todoSpanSet)
 	br, result, pErr :=
-		evaluateBatch(ctx, storagebase.CmdIDKey(""), r.store.Engine(), rec, nil, ba)
+		evaluateBatch(ctx, storagebase.CmdIDKey(""), r.store.Engine(), rec, nil, &ba)
 	if pErr != nil {
 		return errors.Wrapf(pErr.GoError(), "couldn't scan node liveness records in span %s", span)
 	}
@@ -5977,7 +5977,7 @@ func (r *Replica) loadSystemConfig(ctx context.Context) (config.SystemConfig, er
 	// Call evaluateBatch instead of Send to avoid command queue reentrance.
 	rec := NewReplicaEvalContext(r, todoSpanSet)
 	br, result, pErr := evaluateBatch(
-		ctx, storagebase.CmdIDKey(""), r.store.Engine(), rec, nil, ba,
+		ctx, storagebase.CmdIDKey(""), r.store.Engine(), rec, nil, &ba,
 	)
 	if pErr != nil {
 		return config.SystemConfig{}, pErr.GoError()

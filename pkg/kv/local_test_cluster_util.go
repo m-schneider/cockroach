@@ -71,7 +71,7 @@ func InitFactoryForLocalTestCluster(
 				opts SendOptions,
 				rpcContext *rpc.Context,
 				replicas ReplicaSlice,
-				args roachpb.BatchRequest,
+				args *roachpb.BatchRequest,
 			) (Transport, error) {
 				transport, err := senderTransportFactory(opts, rpcContext, replicas, args)
 				if err != nil {

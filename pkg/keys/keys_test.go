@@ -476,7 +476,7 @@ func TestBatchRange(t *testing.T) {
 		for _, pair := range c.req {
 			ba.Add(&roachpb.ScanRequest{Span: roachpb.Span{Key: roachpb.Key(pair[0]), EndKey: roachpb.Key(pair[1])}})
 		}
-		if rs, err := Range(ba); err != nil {
+		if rs, err := Range(&ba); err != nil {
 			t.Errorf("%d: %v", i, err)
 		} else if actPair := [2]string{string(rs.Key), string(rs.EndKey)}; !reflect.DeepEqual(actPair, c.exp) {
 			t.Errorf("%d: expected [%q,%q), got [%q,%q)", i, c.exp[0], c.exp[1], actPair[0], actPair[1])
@@ -503,7 +503,7 @@ func TestBatchError(t *testing.T) {
 	for i, c := range testCases {
 		var ba roachpb.BatchRequest
 		ba.Add(&roachpb.ScanRequest{Span: roachpb.Span{Key: roachpb.Key(c.req[0]), EndKey: roachpb.Key(c.req[1])}})
-		if _, err := Range(ba); !testutils.IsError(err, c.errMsg) {
+		if _, err := Range(&ba); !testutils.IsError(err, c.errMsg) {
 			t.Errorf("%d: unexpected error %v", i, err)
 		}
 	}
@@ -511,7 +511,7 @@ func TestBatchError(t *testing.T) {
 	// Test a case where a non-range request has an end key.
 	var ba roachpb.BatchRequest
 	ba.Add(&roachpb.GetRequest{Span: roachpb.Span{Key: roachpb.Key("a"), EndKey: roachpb.Key("b")}})
-	if _, err := Range(ba); !testutils.IsError(err, "end key specified for non-range operation") {
+	if _, err := Range(&ba); !testutils.IsError(err, "end key specified for non-range operation") {
 		t.Errorf("unexpected error %v", err)
 	}
 }

@@ -63,7 +63,7 @@ var testIdent = roachpb.StoreIdent{
 }
 
 func (s *Store) testSender() client.Sender {
-	return client.Wrap(s, func(ba roachpb.BatchRequest) roachpb.BatchRequest {
+	return client.Wrap(s, func(ba *roachpb.BatchRequest) *roachpb.BatchRequest {
 		if ba.RangeID == 0 {
 			ba.RangeID = 1
 		}
@@ -104,7 +104,7 @@ func (db *testSender) OnFinish(func(error)) { panic("unimplemented") }
 // TxnCoordSender from here.
 // TODO(tschottdorf): {kv->storage}.LocalSender
 func (db *testSender) Send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	if et, ok := ba.GetArg(roachpb.EndTransaction); ok {
 		return nil, roachpb.NewErrorf("%s method not supported", et.Method())
@@ -704,7 +704,7 @@ func TestStoreRemoveReplicaDestroy(t *testing.T) {
 	}
 
 	if _, _, _, pErr := repl1.propose(
-		context.Background(), lease, roachpb.BatchRequest{}, nil, &allSpans,
+		context.Background(), lease, &roachpb.BatchRequest{}, nil, &allSpans,
 	); !pErr.Equal(expErr) {
 		t.Fatalf("expected error %s, but got %v", expErr, pErr)
 	}
@@ -1059,7 +1059,7 @@ func TestStoreAnnotateNow(t *testing.T) {
 				}
 				ba.Add(&pArgs)
 
-				test.check(store.testSender().Send(context.Background(), ba))
+				test.check(store.testSender().Send(context.Background(), &ba))
 			}()
 		}
 	}
@@ -1076,7 +1076,7 @@ func TestStoreExecuteNoop(t *testing.T) {
 	ba.Add(&roachpb.GetRequest{Span: roachpb.Span{Key: roachpb.Key("a")}})
 	ba.Add(&roachpb.NoopRequest{})
 
-	br, pErr := store.Send(context.Background(), ba)
+	br, pErr := store.Send(context.Background(), &ba)
 	if pErr != nil {
 		t.Fatal(pErr)
 	}
@@ -2307,7 +2307,7 @@ func TestStoreScanMultipleIntents(t *testing.T) {
 		ba.Add(&pArgs)
 	}
 	ba.Header = roachpb.Header{Txn: txn}
-	if _, pErr := store.testSender().Send(context.Background(), ba); pErr != nil {
+	if _, pErr := store.testSender().Send(context.Background(), &ba); pErr != nil {
 		t.Fatal(pErr)
 	}
 

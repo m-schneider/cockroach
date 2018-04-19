@@ -59,7 +59,7 @@ func (f *FilterArgs) InRaftCmd() bool {
 // from a request before it is evaluated. Notably, the filter is run before the
 // request is added to the CommandQueue, so blocking in the filter will not
 // block interfering requests.
-type ReplicaRequestFilter func(roachpb.BatchRequest) *roachpb.Error
+type ReplicaRequestFilter func(*roachpb.BatchRequest) *roachpb.Error
 
 // ReplicaCommandFilter may be used in tests through the StoreTestingKnobs to
 // intercept the handling of commands and artificially generate errors. Return
@@ -78,7 +78,7 @@ type ReplicaApplyFilter func(args ApplyFilterArgs) *roachpb.Error
 // ReplicaResponseFilter is used in unittests to modify the outbound
 // response returned to a waiting client after a replica command has
 // been processed. This filter is invoked only by the command proposer.
-type ReplicaResponseFilter func(roachpb.BatchRequest, *roachpb.BatchResponse) *roachpb.Error
+type ReplicaResponseFilter func(*roachpb.BatchRequest, *roachpb.BatchResponse) *roachpb.Error
 
 // CommandQueueAction is an action taken by a BatchRequest's batchCmdSet on the
 // CommandQueue.

@@ -53,7 +53,7 @@ const (
 // If the returned *roachpb.Error is not nil, no response should be
 // returned.
 type Sender interface {
-	Send(context.Context, roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error)
+	Send(context.Context, *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error)
 }
 
 // TxnSender is the interface used to call into a CockroachDB instance
@@ -94,11 +94,11 @@ type TxnSenderFactory interface {
 
 // SenderFunc is an adapter to allow the use of ordinary functions
 // as Senders.
-type SenderFunc func(context.Context, roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error)
+type SenderFunc func(context.Context, *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error)
 
 // Send calls f(ctx, c).
 func (f SenderFunc) Send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	return f(ctx, ba)
 }
@@ -106,11 +106,11 @@ func (f SenderFunc) Send(
 // TxnSenderFunc is an adapter to allow the use of ordinary functions
 // as TxnSenders with GetMeta or AugmentMeta panicing with unimplemented.
 // This is a helper mechanism to facilitate testing.
-type TxnSenderFunc func(context.Context, roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error)
+type TxnSenderFunc func(context.Context, *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error)
 
 // Send calls f(ctx, c).
 func (f TxnSenderFunc) Send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	return f(ctx, ba)
 }
@@ -149,7 +149,7 @@ func SendWrappedWith(
 	ba.Header = h
 	ba.Add(args)
 
-	br, pErr := sender.Send(ctx, ba)
+	br, pErr := sender.Send(ctx, &ba)
 	if pErr != nil {
 		return nil, pErr
 	}
@@ -171,8 +171,8 @@ func SendWrapped(
 
 // Wrap returns a Sender which applies the given function before delegating to
 // the supplied Sender.
-func Wrap(sender Sender, f func(roachpb.BatchRequest) roachpb.BatchRequest) Sender {
-	return SenderFunc(func(ctx context.Context, ba roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+func Wrap(sender Sender, f func(*roachpb.BatchRequest) *roachpb.BatchRequest) Sender {
+	return SenderFunc(func(ctx context.Context, ba *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 		return sender.Send(ctx, f(ba))
 	})
 }

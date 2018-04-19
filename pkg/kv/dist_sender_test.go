@@ -109,7 +109,7 @@ type rpcSendFn func(
 	context.Context,
 	SendOptions,
 	ReplicaSlice,
-	roachpb.BatchRequest,
+	*roachpb.BatchRequest,
 	*rpc.Context,
 ) (*roachpb.BatchResponse, error)
 
@@ -117,7 +117,7 @@ type rpcSendFn func(
 // BatchRequest without performing an RPC call or triggering any
 // test instrumentation.
 var stubRPCSendFn rpcSendFn = func(
-	_ context.Context, _ SendOptions, _ ReplicaSlice, args roachpb.BatchRequest, _ *rpc.Context,
+	_ context.Context, _ SendOptions, _ ReplicaSlice, args *roachpb.BatchRequest, _ *rpc.Context,
 ) (*roachpb.BatchResponse, error) {
 	return args.CreateReply(), nil
 }
@@ -131,7 +131,7 @@ func adaptLegacyTransport(fn rpcSendFn) TransportFactory {
 		opts SendOptions,
 		rpcContext *rpc.Context,
 		replicas ReplicaSlice,
-		args roachpb.BatchRequest,
+		args *roachpb.BatchRequest,
 	) (Transport, error) {
 		return &legacyTransportAdapter{fn, opts, rpcContext, replicas, args, false}, nil
 	}
@@ -142,7 +142,7 @@ type legacyTransportAdapter struct {
 	opts       SendOptions
 	rpcContext *rpc.Context
 	replicas   ReplicaSlice
-	args       roachpb.BatchRequest
+	args       *roachpb.BatchRequest
 
 	called bool
 }
@@ -316,7 +316,7 @@ func TestSendRPCOrder(t *testing.T) {
 		_ context.Context,
 		opts SendOptions,
 		replicas ReplicaSlice,
-		args roachpb.BatchRequest,
+		args *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		if err := verifyCall(opts, replicas); err != nil {
@@ -479,7 +479,7 @@ func TestImmutableBatchArgs(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		args roachpb.BatchRequest,
+		args *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		reply := args.CreateReply()
@@ -540,7 +540,7 @@ func TestRetryOnNotLeaseHolderError(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		args roachpb.BatchRequest,
+		args *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		if first {
@@ -659,7 +659,7 @@ func TestEvictOnFirstRangeGossip(t *testing.T) {
 	g, clock := makeGossip(t, stopper)
 
 	sender := func(
-		_ context.Context, ba roachpb.BatchRequest,
+		_ context.Context, ba *roachpb.BatchRequest,
 	) (*roachpb.BatchResponse, *roachpb.Error) {
 		return ba.CreateReply(), nil
 	}
@@ -774,7 +774,7 @@ func TestEvictCacheOnError(t *testing.T) {
 			_ context.Context,
 			_ SendOptions,
 			_ ReplicaSlice,
-			args roachpb.BatchRequest,
+			args *roachpb.BatchRequest,
 			_ *rpc.Context,
 		) (*roachpb.BatchResponse, error) {
 			if !first {
@@ -846,7 +846,7 @@ func TestEvictCacheOnUnknownLeaseHolder(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		args roachpb.BatchRequest,
+		args *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		var err error
@@ -908,7 +908,7 @@ func TestRetryOnWrongReplicaError(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		ba roachpb.BatchRequest,
+		ba *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		rs, err := keys.Range(ba)
@@ -1002,7 +1002,7 @@ func TestRetryOnWrongReplicaErrorWithSuggestion(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		ba roachpb.BatchRequest,
+		ba *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		rs, err := keys.Range(ba)
@@ -1156,7 +1156,7 @@ func TestSendRPCRetry(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		args roachpb.BatchRequest,
+		args *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		batchReply := &roachpb.BatchResponse{}
@@ -1237,7 +1237,7 @@ func TestMultiRangeGapReverse(t *testing.T) {
 	}
 
 	sender := client.SenderFunc(
-		func(_ context.Context, args roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+		func(_ context.Context, args *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 			rb := args.CreateReply()
 			return rb, nil
 		})
@@ -1287,7 +1287,7 @@ func TestMultiRangeGapReverse(t *testing.T) {
 	// would error with:
 	//
 	// truncation resulted in empty batch on {b-c}: ReverseScan ["a","b"), ReverseScan ["c","d")
-	if _, pErr := ds.Send(context.Background(), ba); pErr != nil {
+	if _, pErr := ds.Send(context.Background(), &ba); pErr != nil {
 		t.Fatal(pErr)
 	}
 }
@@ -1339,7 +1339,7 @@ func TestMultiRangeMergeStaleDescriptor(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		ba roachpb.BatchRequest,
+		ba *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		rs, err := keys.Range(ba)
@@ -1463,7 +1463,7 @@ func TestClockUpdateOnResponse(t *testing.T) {
 	// Test timestamp propagation on valid BatchResults.
 	fakeTime := ds.clock.Now().Add(10000000000 /*10s*/, 0)
 	replyNormal := client.SenderFunc(
-		func(_ context.Context, args roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+		func(_ context.Context, args *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 			rb := args.CreateReply()
 			rb.Now = fakeTime
 			return rb, nil
@@ -1473,7 +1473,7 @@ func TestClockUpdateOnResponse(t *testing.T) {
 	// Test timestamp propagation on errors.
 	fakeTime = ds.clock.Now().Add(10000000000 /*10s*/, 0)
 	replyError := client.SenderFunc(
-		func(_ context.Context, _ roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+		func(_ context.Context, _ *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 			pErr := expectedErr
 			pErr.Now = fakeTime
 			return nil, pErr
@@ -1545,7 +1545,7 @@ func TestTruncateWithSpanAndDescriptor(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		ba roachpb.BatchRequest,
+		ba *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		rs, err := keys.Range(ba)
@@ -1595,7 +1595,7 @@ func TestTruncateWithSpanAndDescriptor(t *testing.T) {
 		ba.Add(roachpb.NewPut(keys.MakeRangeKeyPrefix(roachpb.RKey("b")), val))
 	}
 
-	if _, pErr := ds.Send(context.Background(), ba); pErr != nil {
+	if _, pErr := ds.Send(context.Background(), &ba); pErr != nil {
 		t.Fatal(pErr)
 	}
 
@@ -1671,7 +1671,7 @@ func TestTruncateWithLocalSpanAndDescriptor(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		ba roachpb.BatchRequest,
+		ba *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		h := ba.Requests[0].GetInner().Header()
@@ -1713,7 +1713,7 @@ func TestTruncateWithLocalSpanAndDescriptor(t *testing.T) {
 	ba.Txn = &roachpb.Transaction{Name: "test"}
 	ba.Add(roachpb.NewScan(keys.RangeDescriptorKey(roachpb.RKey("a")), keys.RangeDescriptorKey(roachpb.RKey("c"))))
 
-	if _, pErr := ds.Send(context.Background(), ba); pErr != nil {
+	if _, pErr := ds.Send(context.Background(), &ba); pErr != nil {
 		t.Fatal(pErr)
 	}
 	for i, found := range haveRequest {
@@ -1748,7 +1748,7 @@ func TestSequenceUpdate(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		ba roachpb.BatchRequest,
+		ba *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		expSequence++
@@ -1781,7 +1781,7 @@ func TestSequenceUpdate(t *testing.T) {
 		var ba roachpb.BatchRequest
 		ba.Txn = &txn
 		ba.Add(roachpb.NewPut(roachpb.Key("a"), roachpb.MakeValueFromString("foo")).(*roachpb.PutRequest))
-		br, pErr := ds.Send(context.Background(), ba)
+		br, pErr := ds.Send(context.Background(), &ba)
 		if pErr != nil {
 			t.Fatal(pErr)
 		}
@@ -1886,7 +1886,7 @@ func TestMultiRangeSplitEndTransaction(t *testing.T) {
 		var testFn rpcSendFn = func(
 			_ context.Context,
 			_ SendOptions,
-			_ ReplicaSlice, ba roachpb.BatchRequest,
+			_ ReplicaSlice, ba *roachpb.BatchRequest,
 			_ *rpc.Context,
 		) (*roachpb.BatchResponse, error) {
 			var cur []roachpb.Method
@@ -1918,7 +1918,7 @@ func TestMultiRangeSplitEndTransaction(t *testing.T) {
 		ba.Add(roachpb.NewPut(test.put2, val))
 		ba.Add(&roachpb.EndTransactionRequest{Span: roachpb.Span{Key: test.et}})
 
-		if _, pErr := ds.Send(context.Background(), ba); pErr != nil {
+		if _, pErr := ds.Send(context.Background(), &ba); pErr != nil {
 			t.Fatal(pErr)
 		}
 
@@ -2011,11 +2011,11 @@ func TestSenderTransport(t *testing.T) {
 		client.SenderFunc(
 			func(
 				_ context.Context,
-				_ roachpb.BatchRequest,
+				_ *roachpb.BatchRequest,
 			) (r *roachpb.BatchResponse, e *roachpb.Error) {
 				return
 			},
-		))(SendOptions{}, &rpc.Context{}, nil, roachpb.BatchRequest{})
+		))(SendOptions{}, &rpc.Context{}, nil, &roachpb.BatchRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2050,7 +2050,7 @@ func TestGatewayNodeID(t *testing.T) {
 		_ context.Context,
 		_ SendOptions,
 		_ ReplicaSlice,
-		ba roachpb.BatchRequest,
+		ba *roachpb.BatchRequest,
 		_ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		observedNodeID = ba.Header.GatewayNodeID
@@ -2068,7 +2068,7 @@ func TestGatewayNodeID(t *testing.T) {
 	ds := NewDistSender(cfg, g)
 	var ba roachpb.BatchRequest
 	ba.Add(roachpb.NewPut(roachpb.Key("a"), roachpb.MakeValueFromString("value")))
-	if _, err := ds.Send(context.Background(), ba); err != nil {
+	if _, err := ds.Send(context.Background(), &ba); err != nil {
 		t.Fatalf("put encountered error: %s", err)
 	}
 	if observedNodeID != expNodeID {
@@ -2165,7 +2165,7 @@ func TestErrorIndexAlignment(t *testing.T) {
 				_ context.Context,
 				_ SendOptions,
 				_ ReplicaSlice,
-				ba roachpb.BatchRequest,
+				ba *roachpb.BatchRequest,
 				_ *rpc.Context,
 			) (*roachpb.BatchResponse, error) {
 				reply := ba.CreateReply()
@@ -2207,7 +2207,7 @@ func TestErrorIndexAlignment(t *testing.T) {
 			val = roachpb.MakeValueFromString("val")
 			ba.Add(roachpb.NewPut(roachpb.Key("c"), val))
 
-			_, pErr := ds.Send(context.Background(), ba)
+			_, pErr := ds.Send(context.Background(), &ba)
 			if pErr == nil {
 				t.Fatalf("expected an error to be returned from distSender")
 			}

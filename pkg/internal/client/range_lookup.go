@@ -332,11 +332,11 @@ func lookupRangeFwdScan(
 		// TODO(nvanbenschoten): remove in version 2.1.
 		DeprecatedReturnIntents: rc == roachpb.INCONSISTENT,
 	})
-	if !TestingIsRangeLookup(ba) {
+	if !TestingIsRangeLookup(&ba) {
 		log.Fatalf(ctx, "BatchRequest %v not detectable as RangeLookup", ba)
 	}
 
-	br, pErr := sender.Send(ctx, ba)
+	br, pErr := sender.Send(ctx, &ba)
 	if pErr != nil {
 		return nil, nil, pErr.GoError()
 	}
@@ -403,11 +403,11 @@ func lookupRangeRevScan(
 		// See explanation above in lookupRangeFwdScan.
 		DeprecatedReturnIntents: rc == roachpb.INCONSISTENT,
 	})
-	if !TestingIsRangeLookup(ba) {
+	if !TestingIsRangeLookup(&ba) {
 		log.Fatalf(ctx, "BatchRequest %v not detectable as RangeLookup", ba)
 	}
 
-	br, pErr := sender.Send(ctx, ba)
+	br, pErr := sender.Send(ctx, &ba)
 	if pErr != nil {
 		return nil, nil, pErr.GoError()
 	}
@@ -487,7 +487,7 @@ func LegacyRangeLookup(
 		Reverse:   prefetchReverse,
 	})
 
-	br, pErr := sender.Send(ctx, ba)
+	br, pErr := sender.Send(ctx, &ba)
 	if pErr != nil {
 		return nil, nil, pErr.GoError()
 	}
@@ -554,7 +554,7 @@ func kvsToRangeDescriptors(kvs []roachpb.KeyValue) ([]roachpb.RangeDescriptor, e
 // TestingIsRangeLookup returns if the provided BatchRequest looks like a single
 // RangeLookup scan. It can return false positives and should only be used in
 // tests.
-func TestingIsRangeLookup(ba roachpb.BatchRequest) bool {
+func TestingIsRangeLookup(ba *roachpb.BatchRequest) bool {
 	if ba.IsSingleRequest() {
 		return TestingIsRangeLookupRequest(ba.Requests[0].GetInner())
 	}

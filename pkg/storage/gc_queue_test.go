@@ -977,11 +977,11 @@ func TestGCQueueChunkRequests(t *testing.T) {
 		ba2.Add(&pArgs)
 	}
 	ba1.Header = roachpb.Header{Timestamp: tc.Clock().Now()}
-	if _, pErr := tc.Sender().Send(context.Background(), ba1); pErr != nil {
+	if _, pErr := tc.Sender().Send(context.Background(), &ba1); pErr != nil {
 		t.Fatal(pErr)
 	}
 	ba2.Header = roachpb.Header{Timestamp: tc.Clock().Now()}
-	if _, pErr := tc.Sender().Send(context.Background(), ba2); pErr != nil {
+	if _, pErr := tc.Sender().Send(context.Background(), &ba2); pErr != nil {
 		t.Fatal(pErr)
 	}
 
@@ -1001,7 +1001,7 @@ func TestGCQueueChunkRequests(t *testing.T) {
 		pArgs2 := putArgs(key2, []byte(fmt.Sprintf("value%04d", i)))
 		ba.Add(&pArgs2)
 		ba.Header = roachpb.Header{Timestamp: tc.Clock().Now()}
-		if _, pErr := tc.Sender().Send(context.Background(), ba); pErr != nil {
+		if _, pErr := tc.Sender().Send(context.Background(), &ba); pErr != nil {
 			t.Fatal(pErr)
 		}
 	}

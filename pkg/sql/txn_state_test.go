@@ -58,7 +58,7 @@ func makeTestContext() testContext {
 	clock := hlc.NewClock(manual.UnixNano, time.Nanosecond)
 	factory := client.TxnSenderFactoryFunc(func(client.TxnType) client.TxnSender {
 		return client.TxnSenderFunc(
-			func(context.Context, roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+			func(context.Context, *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 				return nil, nil
 			},
 		)

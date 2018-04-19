@@ -353,10 +353,9 @@ func (tc *TxnCoordSender) OnFinish(onFinishFn func(error)) {
 // write intents; they're tagged to an outgoing EndTransaction request, with
 // the receiving replica in charge of resolving them.
 func (tc *TxnCoordSender) Send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	ctx = tc.AnnotateCtx(ctx)
-
 	// Start new or pick up active trace. From here on, there's always an active
 	// Trace, though its overhead is small unless it's sampled.
 	sp := opentracing.SpanFromContext(ctx)
@@ -375,7 +374,7 @@ func (tc *TxnCoordSender) Send(
 		}
 
 		// If this request is part of a transaction...
-		if err := tc.validateTxnForBatch(ctx, &ba); err != nil {
+		if err := tc.validateTxnForBatch(ctx, ba); err != nil {
 			return nil, roachpb.NewError(err)
 		}
 
@@ -486,9 +485,10 @@ func (tc *TxnCoordSender) Send(
 	// opportunities in case of error.
 	var br *roachpb.BatchResponse
 	{
+		ba3 := *ba
 		var pErr *roachpb.Error
 		if br, pErr = tc.wrapped.Send(ctx, ba); pErr != nil {
-			br, pErr = tc.maybeRetrySend(ctx, &ba, br, pErr)
+			br, pErr = tc.maybeRetrySend(ctx, &ba3, br, pErr)
 		}
 
 		if pErr = tc.updateState(ctx, startNS, ba, br, pErr); pErr != nil {
@@ -549,7 +549,7 @@ func (tc *TxnCoordSender) maybeRetrySend(
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 
 	if _, ok := pErr.GetDetail().(*roachpb.OpRequiresTxnError); ok {
-		return tc.resendWithTxn(ctx, *ba)
+		return tc.resendWithTxn(ctx, ba)
 	}
 
 	// With mixed success, we can't attempt a retry without potentially
@@ -585,10 +585,11 @@ func (tc *TxnCoordSender) maybeRetrySend(
 	retryBa := *ba
 	if br != nil {
 		doneBa := *ba
+		log.Infof(context.TODO(), "%s", doneBa)
 		doneBa.Requests = ba.Requests[:len(br.Responses)]
 		log.VEventf(ctx, 2, "collecting refresh spans after partial batch execution of %s", doneBa)
 		tc.mu.Lock()
-		if !tc.appendRefreshSpansLocked(ctx, doneBa, br) {
+		if !tc.appendRefreshSpansLocked(ctx, &doneBa, br) {
 			tc.mu.Unlock()
 			return nil, pErr
 		}
@@ -608,7 +609,7 @@ func (tc *TxnCoordSender) maybeRetrySend(
 	// We've refreshed all of the read spans successfully and set
 	// newBa.Txn.RefreshedTimestamp to the current timestamp. Submit the
 	// batch again.
-	retryBr, retryErr := tc.wrapped.Send(ctx, retryBa)
+	retryBr, retryErr := tc.wrapped.Send(ctx, &retryBa)
 	if retryErr != nil {
 		log.VEventf(ctx, 2, "retry failed with %s", retryErr)
 		return nil, retryErr
@@ -642,7 +643,7 @@ func (tc *TxnCoordSender) maybeRetrySend(
 // in use with this sender. In that case the caller should return an
 // error for client-side retry.
 func (tc *TxnCoordSender) appendRefreshSpansLocked(
-	ctx context.Context, ba roachpb.BatchRequest, br *roachpb.BatchResponse,
+	ctx context.Context, ba *roachpb.BatchRequest, br *roachpb.BatchResponse,
 ) bool {
 	origTS := ba.Txn.OrigTimestamp
 	origTS.Forward(ba.Txn.RefreshedTimestamp)
@@ -713,7 +714,7 @@ func (tc *TxnCoordSender) tryUpdatingTxnSpans(
 	}
 	addRefreshes(refreshReads, false)
 	addRefreshes(refreshWrites, true)
-	if _, batchErr := tc.wrapped.Send(ctx, refreshSpanBa); batchErr != nil {
+	if _, batchErr := tc.wrapped.Send(ctx, &refreshSpanBa); batchErr != nil {
 		log.VEventf(ctx, 2, "failed to refresh txn spans (%s); propagating original retry error", batchErr)
 		return false
 	}
@@ -722,7 +723,7 @@ func (tc *TxnCoordSender) tryUpdatingTxnSpans(
 }
 
 func (tc *TxnCoordSender) appendAndCondenseIntentsLocked(
-	ctx context.Context, ba roachpb.BatchRequest, br *roachpb.BatchResponse,
+	ctx context.Context, ba *roachpb.BatchRequest, br *roachpb.BatchResponse,
 ) {
 	ba.IntentSpanIterate(br, func(span roachpb.Span) {
 		tc.mu.meta.Intents = append(tc.mu.meta.Intents, span)
@@ -1091,7 +1092,7 @@ func (tc *TxnCoordSender) heartbeat(ctx context.Context) bool {
 	ba.Add(hb)
 
 	log.VEvent(ctx, 2, "heartbeat")
-	br, pErr := tc.wrapped.Send(ctx, ba)
+	br, pErr := tc.wrapped.Send(ctx, &ba)
 
 	// Correctness mandates that when we can't heartbeat the transaction, we
 	// make sure the client doesn't keep going. This is particularly relevant
@@ -1148,7 +1149,7 @@ func (tc *TxnCoordSender) heartbeat(ctx context.Context) bool {
 func (tc *TxnCoordSender) updateState(
 	ctx context.Context,
 	startNS int64,
-	ba roachpb.BatchRequest,
+	ba *roachpb.BatchRequest,
 	br *roachpb.BatchResponse,
 	pErr *roachpb.Error,
 ) *roachpb.Error {
@@ -1364,7 +1365,7 @@ func (tc *TxnCoordSender) updateState(
 // run the whole thing for them, or any restart will still end up at the client
 // which will not be prepared to be handed a Txn.
 func (tc *TxnCoordSender) resendWithTxn(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	// Run a one-off transaction with that single command.
 	if log.V(1) {

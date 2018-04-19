@@ -70,7 +70,7 @@ type BatchCall struct {
 // TODO(bdarnell): clean up this crufty interface; it was extracted
 // verbatim from the non-abstracted code.
 type TransportFactory func(
-	SendOptions, *rpc.Context, ReplicaSlice, roachpb.BatchRequest,
+	SendOptions, *rpc.Context, ReplicaSlice, *roachpb.BatchRequest,
 ) (Transport, error)
 
 // Transport objects can send RPCs to one or more replicas of a range.
@@ -114,7 +114,7 @@ type Transport interface {
 // During race builds, we wrap this to hold on to and read all obtained
 // requests in a tight loop, exposing data races; see transport_race.go.
 func grpcTransportFactoryImpl(
-	opts SendOptions, rpcContext *rpc.Context, replicas ReplicaSlice, args roachpb.BatchRequest,
+	opts SendOptions, rpcContext *rpc.Context, replicas ReplicaSlice, args *roachpb.BatchRequest,
 ) (Transport, error) {
 	clients := make([]batchClient, 0, len(replicas))
 	for _, replica := range replicas {
@@ -124,7 +124,7 @@ func grpcTransportFactoryImpl(
 		healthy := rpcContext.ConnHealth(remoteAddr) == nil
 		clients = append(clients, batchClient{
 			remoteAddr: remoteAddr,
-			args:       argsCopy,
+			args:       *argsCopy,
 			healthy:    healthy,
 		})
 	}
@@ -377,7 +377,7 @@ func (h byHealth) Less(i, j int) bool { return h[i].healthy && !h[j].healthy }
 // without a full RPC stack.
 func SenderTransportFactory(tracer opentracing.Tracer, sender client.Sender) TransportFactory {
 	return func(
-		_ SendOptions, _ *rpc.Context, _ ReplicaSlice, args roachpb.BatchRequest,
+		_ SendOptions, _ *rpc.Context, _ ReplicaSlice, args *roachpb.BatchRequest,
 	) (Transport, error) {
 		return &senderTransport{tracer, sender, args, false}, nil
 	}
@@ -386,7 +386,7 @@ func SenderTransportFactory(tracer opentracing.Tracer, sender client.Sender) Tra
 type senderTransport struct {
 	tracer opentracing.Tracer
 	sender client.Sender
-	args   roachpb.BatchRequest
+	args   *roachpb.BatchRequest
 
 	called bool
 }

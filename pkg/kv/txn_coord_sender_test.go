@@ -340,7 +340,7 @@ func TestTxnCoordSenderCondenseIntentSpans(t *testing.T) {
 	// key "c" as it's merged with the cToEClosed span.
 	expIntents := []roachpb.Span{fTog1Closed, cToEClosed, a, b}
 	var sendFn rpcSendFn = func(
-		_ context.Context, _ SendOptions, _ ReplicaSlice, args roachpb.BatchRequest, _ *rpc.Context,
+		_ context.Context, _ SendOptions, _ ReplicaSlice, args *roachpb.BatchRequest, _ *rpc.Context,
 	) (*roachpb.BatchResponse, error) {
 		if req, ok := args.GetArg(roachpb.EndTransaction); ok {
 			if a, e := req.(*roachpb.EndTransactionRequest).IntentSpans, expIntents; !reflect.DeepEqual(a, e) {
@@ -441,7 +441,7 @@ func TestTxnCoordSenderHeartbeat(t *testing.T) {
 			Poison: true,
 		})
 		ba.Txn = initialTxn.Proto()
-		if _, pErr := tc.TxnCoordSenderFactory.wrapped.Send(context.Background(), ba); pErr != nil {
+		if _, pErr := tc.TxnCoordSenderFactory.wrapped.Send(context.Background(), &ba); pErr != nil {
 			t.Fatal(pErr)
 		}
 	}
@@ -689,7 +689,7 @@ func TestTxnCoordSenderCancel(t *testing.T) {
 	tc := s.DB.GetSender().(*TxnCoordSender)
 	origSender := tc.TxnCoordSenderFactory.wrapped
 	tc.TxnCoordSenderFactory.wrapped = client.SenderFunc(
-		func(ctx context.Context, args roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+		func(ctx context.Context, args *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 			if _, hasET := args.GetArg(roachpb.EndTransaction); hasET {
 				// Cancel the transaction while also sending it along. This tickled a
 				// data race in TxnCoordSender.tryAsyncAbort. See #7726.
@@ -731,7 +731,7 @@ func TestTxnCoordSenderGCTimeout(t *testing.T) {
 	knobs := &storage.StoreTestingKnobs{
 		DisableScanner:    true,
 		DisableSplitQueue: true,
-		TestingRequestFilter: func(ba roachpb.BatchRequest) *roachpb.Error {
+		TestingRequestFilter: func(ba *roachpb.BatchRequest) *roachpb.Error {
 			for _, req := range ba.Requests {
 				if getReq, ok := req.GetInner().(*roachpb.GetRequest); ok && getReq.Key.Equal(key) {
 					<-signal
@@ -859,7 +859,7 @@ func TestTxnCoordSenderGCWithAmbiguousResultErr(t *testing.T) {
 		key := roachpb.Key("a")
 		are := roachpb.NewAmbiguousResultError("very ambiguous")
 		knobs := &storage.StoreTestingKnobs{
-			TestingResponseFilter: func(ba roachpb.BatchRequest, br *roachpb.BatchResponse) *roachpb.Error {
+			TestingResponseFilter: func(ba *roachpb.BatchRequest, br *roachpb.BatchResponse) *roachpb.Error {
 				for _, req := range ba.Requests {
 					if putReq, ok := req.GetInner().(*roachpb.PutRequest); ok && putReq.Key.Equal(key) {
 						return roachpb.NewError(are)
@@ -1004,7 +1004,7 @@ func TestTxnCoordSenderTxnUpdatedOnError(t *testing.T) {
 			clock := hlc.NewClock(manual.UnixNano, 20*time.Nanosecond)
 
 			var senderFn client.SenderFunc = func(
-				_ context.Context, ba roachpb.BatchRequest,
+				_ context.Context, ba *roachpb.BatchRequest,
 			) (*roachpb.BatchResponse, *roachpb.Error) {
 				var reply *roachpb.BatchResponse
 				pErr := test.pErrGen(ba.Txn)
@@ -1190,7 +1190,7 @@ func TestTxnCoordSenderSingleRoundtripTxn(t *testing.T) {
 	manual := hlc.NewManualClock(123)
 	clock := hlc.NewClock(manual.UnixNano, 20*time.Nanosecond)
 
-	var senderFn client.SenderFunc = func(_ context.Context, ba roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+	var senderFn client.SenderFunc = func(_ context.Context, ba *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 		br := ba.CreateReply()
 		txnClone := ba.Txn.Clone()
 		br.Txn = &txnClone
@@ -1216,7 +1216,7 @@ func TestTxnCoordSenderSingleRoundtripTxn(t *testing.T) {
 	ba.Add(&roachpb.EndTransactionRequest{})
 	txn := roachpb.MakeTransaction("test", key, 0, 0, clock.Now(), 0)
 	ba.Txn = &txn
-	_, pErr := tc.Send(context.Background(), ba)
+	_, pErr := tc.Send(context.Background(), &ba)
 	if pErr != nil {
 		t.Fatal(pErr)
 	}
@@ -1246,7 +1246,7 @@ func TestTxnCoordSenderErrorWithIntent(t *testing.T) {
 	}
 	for i, test := range testCases {
 		func() {
-			var senderFn client.SenderFunc = func(_ context.Context, ba roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+			var senderFn client.SenderFunc = func(_ context.Context, ba *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 				txn := ba.Txn.Clone()
 				txn.Writing = true
 				pErr := &roachpb.Error{}
@@ -1274,7 +1274,7 @@ func TestTxnCoordSenderErrorWithIntent(t *testing.T) {
 			ba.Add(&roachpb.EndTransactionRequest{})
 			txn := roachpb.MakeTransaction("test", key, 0, 0, clock.Now(), 0)
 			ba.Txn = &txn
-			_, pErr := tc.Send(context.Background(), ba)
+			_, pErr := tc.Send(context.Background(), &ba)
 			if !testutils.IsPError(pErr, test.errMsg) {
 				t.Errorf("%d: error did not match %s: %v", i, test.errMsg, pErr)
 			}
@@ -1292,7 +1292,7 @@ func TestTxnCoordSenderNoDuplicateIntents(t *testing.T) {
 
 	var expectedIntents []roachpb.Span
 
-	var senderFn client.SenderFunc = func(_ context.Context, ba roachpb.BatchRequest) (
+	var senderFn client.SenderFunc = func(_ context.Context, ba *roachpb.BatchRequest) (
 		*roachpb.BatchResponse, *roachpb.Error) {
 		if rArgs, ok := ba.GetArg(roachpb.EndTransaction); ok {
 			et := rArgs.(*roachpb.EndTransactionRequest)
@@ -1488,7 +1488,7 @@ func createNonCancelableDB(db *client.DB) (*client.DB, *TxnCoordSender) {
 	// context's lifetime instead. In this test, we are testing timeout-based
 	// abandonment, so we need to supply a non-cancelable context.
 	var factory client.TxnSenderFactoryFunc = func(_ client.TxnType) client.TxnSender {
-		return client.TxnSenderFunc(func(_ context.Context, ba roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+		return client.TxnSenderFunc(func(_ context.Context, ba *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 			return tc.Send(context.Background(), ba)
 		})
 	}
@@ -1802,7 +1802,7 @@ func TestAbortTransactionOnCommitErrors(t *testing.T) {
 			stopper := stop.NewStopper()
 			defer stopper.Stop(context.TODO())
 			var senderFn client.SenderFunc = func(
-				_ context.Context, ba roachpb.BatchRequest,
+				_ context.Context, ba *roachpb.BatchRequest,
 			) (*roachpb.BatchResponse, *roachpb.Error) {
 				br := ba.CreateReply()
 

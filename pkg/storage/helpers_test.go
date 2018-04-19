@@ -436,7 +436,7 @@ func ProposeAddSSTable(ctx context.Context, key, val string, ts hlc.Timestamp, s
 	addReq.EndKey = addReq.Key.Next()
 	ba.Add(&addReq)
 
-	_, pErr := store.Send(ctx, ba)
+	_, pErr := store.Send(ctx, &ba)
 	if pErr != nil {
 		return pErr.GoError()
 	}

@@ -465,7 +465,7 @@ func sendAndFill(ctx context.Context, send SenderFunc, b *Batch) error {
 	var ba roachpb.BatchRequest
 	ba.Requests = b.reqs
 	ba.Header = b.Header
-	b.response, b.pErr = send(ctx, ba)
+	b.response, b.pErr = send(ctx, &ba)
 	b.fillResults(ctx)
 	if b.pErr == nil {
 		b.pErr = roachpb.NewError(b.resultErr())
@@ -530,14 +530,14 @@ func (db *DB) Txn(ctx context.Context, retryable func(context.Context, *Txn) err
 // send runs the specified calls synchronously in a single batch and returns
 // any errors. Returns (nil, nil) for an empty batch.
 func (db *DB) send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	return db.sendUsingSender(ctx, ba, db.GetSender())
 }
 
 // sendUsingSender uses the specified sender to send the batch request.
 func (db *DB) sendUsingSender(
-	ctx context.Context, ba roachpb.BatchRequest, sender Sender,
+	ctx context.Context, ba *roachpb.BatchRequest, sender Sender,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	if len(ba.Requests) == 0 {
 		return nil, nil

@@ -902,7 +902,7 @@ func (n *Node) batchInternal(
 
 		tStart := timeutil.Now()
 		var pErr *roachpb.Error
-		br, pErr = n.stores.Send(ctx, *args)
+		br, pErr = n.stores.Send(ctx, args)
 		if pErr != nil {
 			br = &roachpb.BatchResponse{}
 			log.VErrEventf(ctx, 3, "%T", pErr.GetDetail())

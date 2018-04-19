@@ -240,6 +240,7 @@ func (ba *BatchRequest) IntentSpanIterate(br *BatchResponse, fn func(Span)) {
 func (ba *BatchRequest) RefreshSpanIterate(br *BatchResponse, fn func(Span, bool)) {
 	for i, arg := range ba.Requests {
 		req := arg.GetInner()
+
 		if !NeedsRefresh(req) {
 			continue
 		}

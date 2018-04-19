@@ -296,7 +296,7 @@ func (f *txnKVFetcher) fetch(ctx context.Context) error {
 	// Reset spans in preparation for adding resume-spans below.
 	f.spans = f.spans[:0]
 
-	br, err := f.txn.Send(ctx, ba)
+	br, err := f.txn.Send(ctx, &ba)
 	if err != nil {
 		return err.GoError()
 	}

@@ -691,7 +691,7 @@ type StoreTestingKnobs struct {
 	// A hack to manipulate the clock before sending a batch request to a replica.
 	// TODO(kaneda): This hook is not encouraged to use. Get rid of it once
 	// we make TestServer take a ManualClock.
-	ClockBeforeSend func(*hlc.Clock, roachpb.BatchRequest)
+	ClockBeforeSend func(*hlc.Clock, *roachpb.BatchRequest)
 	// OnCampaign is called if the replica campaigns for Raft leadership
 	// when initializing the Raft group. Note that this method is invoked
 	// with both Replica.raftMu and Replica.mu locked.
@@ -2656,7 +2656,7 @@ func (s *Store) deadReplicas() roachpb.StoreDeadReplicas {
 // of one of its writes), the response will have a transaction set which should
 // be used to update the client transaction.
 func (s *Store) Send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (br *roachpb.BatchResponse, pErr *roachpb.Error) {
 	// Attach any log tags from the store to the context (which normally
 	// comes from gRPC).
@@ -2805,7 +2805,7 @@ func (s *Store) Send(
 		// If necessary, the request may need to wait in the txn wait queue,
 		// pending updates to the target transaction for either PushTxn or
 		// QueryTxn requests.
-		if br, pErr = s.maybeWaitForPushee(ctx, &ba, repl); br != nil || pErr != nil {
+		if br, pErr = s.maybeWaitForPushee(ctx, ba, repl); br != nil || pErr != nil {
 			return br, pErr
 		}
 		br, pErr = repl.Send(ctx, ba)

@@ -85,7 +85,7 @@ func TestAmbiguousCommit(t *testing.T) {
 		}
 
 		params.Knobs.DistSender = &kv.DistSenderTestingKnobs{
-			TransportFactory: func(opts kv.SendOptions, rpcContext *rpc.Context, replicas kv.ReplicaSlice, args roachpb.BatchRequest) (kv.Transport, error) {
+			TransportFactory: func(opts kv.SendOptions, rpcContext *rpc.Context, replicas kv.ReplicaSlice, args *roachpb.BatchRequest) (kv.Transport, error) {
 				transport, err := kv.GRPCTransportFactory(opts, rpcContext, replicas, args)
 				return &interceptingTransport{
 					Transport: transport,
@@ -130,7 +130,7 @@ func TestAmbiguousCommit(t *testing.T) {
 
 		if ambiguousSuccess {
 			params.Knobs.Store = &storage.StoreTestingKnobs{
-				TestingResponseFilter: func(args roachpb.BatchRequest, _ *roachpb.BatchResponse) *roachpb.Error {
+				TestingResponseFilter: func(args *roachpb.BatchRequest, _ *roachpb.BatchResponse) *roachpb.Error {
 					if req, ok := args.GetArg(roachpb.ConditionalPut); ok {
 						return maybeRPCError(req.(*roachpb.ConditionalPutRequest))
 					}

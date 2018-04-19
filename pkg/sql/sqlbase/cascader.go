@@ -483,7 +483,7 @@ func (c *cascader) deleteRows(
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	br, roachErr := c.txn.Send(ctx, req)
+	br, roachErr := c.txn.Send(ctx, &req)
 	if roachErr != nil {
 		return nil, nil, 0, roachErr.GoError()
 	}
@@ -544,7 +544,7 @@ func (c *cascader) deleteRows(
 		return nil, nil, 0, err
 	}
 	primaryKeysToDelete.Clear(ctx)
-	pkResp, roachErr := c.txn.Send(ctx, pkLookupReq)
+	pkResp, roachErr := c.txn.Send(ctx, &pkLookupReq)
 	if roachErr != nil {
 		return nil, nil, 0, roachErr.GoError()
 	}
@@ -704,7 +704,7 @@ func (c *cascader) updateRows(
 		if err != nil {
 			return nil, nil, nil, 0, err
 		}
-		br, roachErr := c.txn.Send(ctx, req)
+		br, roachErr := c.txn.Send(ctx, &req)
 		if roachErr != nil {
 			return nil, nil, nil, 0, roachErr.GoError()
 		}
@@ -759,7 +759,7 @@ func (c *cascader) updateRows(
 			return nil, nil, nil, 0, err
 		}
 		primaryKeysToUpdate.Clear(ctx)
-		pkResp, roachErr := c.txn.Send(ctx, pkLookupReq)
+		pkResp, roachErr := c.txn.Send(ctx, &pkLookupReq)
 		if roachErr != nil {
 			return nil, nil, nil, 0, roachErr.GoError()
 		}

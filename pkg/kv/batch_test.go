@@ -171,12 +171,12 @@ func TestBatchPrevNext(t *testing.T) {
 				args.Key, args.EndKey = span.Key, span.EndKey
 				ba.Add(args)
 			}
-			if next, err := next(ba, roachpb.RKey(test.key)); err != nil {
+			if next, err := next(&ba, roachpb.RKey(test.key)); err != nil {
 				t.Error(err)
 			} else if !bytes.Equal(next, roachpb.Key(test.expFW)) {
 				t.Errorf("next: expected %q, got %q", test.expFW, next)
 			}
-			if prev, err := prev(ba, roachpb.RKey(test.key)); err != nil {
+			if prev, err := prev(&ba, roachpb.RKey(test.key)); err != nil {
 				t.Error(err)
 			} else if !bytes.Equal(prev, roachpb.Key(test.expBW)) {
 				t.Errorf("prev: expected %q, got %q", test.expBW, prev)
@@ -197,7 +197,7 @@ func TestBatchPrevNextWithNoop(t *testing.T) {
 	ba.Add(&roachpb.GetRequest{Span: roachpb.Span{Key: rightKey}})
 
 	t.Run("prev", func(t *testing.T) {
-		rk, err := prev(ba, middleKey)
+		rk, err := prev(&ba, middleKey)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -206,7 +206,7 @@ func TestBatchPrevNextWithNoop(t *testing.T) {
 		}
 	})
 	t.Run("next", func(t *testing.T) {
-		rk, err := next(ba, middleKey)
+		rk, err := next(&ba, middleKey)
 		if err != nil {
 			t.Fatal(err)
 		}

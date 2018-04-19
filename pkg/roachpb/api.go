@@ -84,7 +84,7 @@ func (rc ReadConsistencyType) RequiresReadLease() bool {
 
 // SupportsBatch determines whether the methods in the provided batch
 // are supported by the ReadConsistencyType, returning an error if not.
-func (rc ReadConsistencyType) SupportsBatch(ba BatchRequest) error {
+func (rc ReadConsistencyType) SupportsBatch(ba *BatchRequest) error {
 	switch rc {
 	case CONSISTENT:
 		return nil

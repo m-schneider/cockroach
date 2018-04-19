@@ -313,7 +313,7 @@ func (ds *DistSender) RangeLookup(
 func (ds *DistSender) legacyRangeLookup(
 	ctx context.Context, key roachpb.RKey, desc *roachpb.RangeDescriptor, useReverseScan bool,
 ) ([]roachpb.RangeDescriptor, []roachpb.RangeDescriptor, error) {
-	sender := client.SenderFunc(func(ctx context.Context, ba roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
+	sender := client.SenderFunc(func(ctx context.Context, ba *roachpb.BatchRequest) (*roachpb.BatchResponse, *roachpb.Error) {
 		replicas := NewReplicaSlice(ds.gossip, desc)
 		shuffle.Shuffle(replicas)
 		br, err := ds.sendRPC(ctx, desc.RangeID, replicas, ba)
@@ -378,7 +378,7 @@ func (ds *DistSender) getNodeDescriptor() *roachpb.NodeDescriptor {
 // The replicas are assumed to be ordered by preference, with closer
 // ones (i.e. expected lowest latency) first.
 func (ds *DistSender) sendRPC(
-	ctx context.Context, rangeID roachpb.RangeID, replicas ReplicaSlice, ba roachpb.BatchRequest,
+	ctx context.Context, rangeID roachpb.RangeID, replicas ReplicaSlice, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, error) {
 	if len(replicas) == 0 {
 		return nil, roachpb.NewSendError(
@@ -437,7 +437,7 @@ func (ds *DistSender) getDescriptor(
 
 // sendSingleRange gathers and rearranges the replicas, and makes an RPC call.
 func (ds *DistSender) sendSingleRange(
-	ctx context.Context, ba roachpb.BatchRequest, desc *roachpb.RangeDescriptor,
+	ctx context.Context, ba *roachpb.BatchRequest, desc *roachpb.RangeDescriptor,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	// Try to send the call.
 	replicas := NewReplicaSlice(ds.gossip, desc)
@@ -563,7 +563,7 @@ var errNo1PCTxn = roachpb.NewErrorf("cannot send 1PC txn to multiple ranges")
 // flag is reset to indicate whether earlier parts of the split may
 // result in refresh spans.
 func splitBatchAndCheckForRefreshSpans(
-	ba roachpb.BatchRequest, canSplitET bool,
+	ba *roachpb.BatchRequest, canSplitET bool,
 ) [][]roachpb.RequestUnion {
 	parts := ba.Split(canSplitET)
 	// If the final part contains an EndTransaction, we need to check
@@ -612,13 +612,13 @@ func splitBatchAndCheckForRefreshSpans(
 // spans encountered in the transaction and retry just the
 // EndTransaction request to avoid client-side serializable txn retries.
 func (ds *DistSender) Send(
-	ctx context.Context, ba roachpb.BatchRequest,
+	ctx context.Context, ba *roachpb.BatchRequest,
 ) (*roachpb.BatchResponse, *roachpb.Error) {
 	ds.metrics.BatchCount.Inc(1)
 
 	tracing.AnnotateTrace()
 
-	if pErr := ds.initAndVerifyBatch(ctx, &ba); pErr != nil {
+	if pErr := ds.initAndVerifyBatch(ctx, ba); pErr != nil {
 		return nil, pErr
 	}
 
@@ -719,7 +719,7 @@ type response struct {
 // this method. It's specified as non-zero when this method is invoked
 // recursively.
 func (ds *DistSender) divideAndSendBatchToRanges(
-	ctx context.Context, ba roachpb.BatchRequest, rs roachpb.RSpan, batchIdx int,
+	ctx context.Context, ba *roachpb.BatchRequest, rs roachpb.RSpan, batchIdx int,
 ) (br *roachpb.BatchResponse, pErr *roachpb.Error) {
 	// Get initial seek key depending on direction of iteration.
 	var scanDir ScanDirection
@@ -980,7 +980,7 @@ func (ds *DistSender) divideAndSendBatchToRanges(
 // sent.
 func (ds *DistSender) sendPartialBatchAsync(
 	ctx context.Context,
-	ba roachpb.BatchRequest,
+	ba *roachpb.BatchRequest,
 	rs roachpb.RSpan,
 	desc *roachpb.RangeDescriptor,
 	evictToken *EvictionToken,
@@ -1013,7 +1013,7 @@ func (ds *DistSender) sendPartialBatchAsync(
 // descriptor.
 func (ds *DistSender) sendPartialBatch(
 	ctx context.Context,
-	ba roachpb.BatchRequest,
+	ba *roachpb.BatchRequest,
 	rs roachpb.RSpan,
 	desc *roachpb.RangeDescriptor,
 	evictToken *EvictionToken,
@@ -1179,7 +1179,7 @@ func includesFrontOfCurSpan(isReverse bool, rd *roachpb.RangeDescriptor, rs roac
 // nextKey is the first key that was not processed. This will be used when
 // filling up the ResumeSpan's.
 func fillSkippedResponses(
-	ba roachpb.BatchRequest,
+	ba *roachpb.BatchRequest,
 	br *roachpb.BatchResponse,
 	nextKey roachpb.RKey,
 	resumeReason roachpb.ResponseHeader_ResumeReason,
@@ -1266,7 +1266,7 @@ func (ds *DistSender) sendToReplicas(
 	opts SendOptions,
 	rangeID roachpb.RangeID,
 	replicas ReplicaSlice,
-	args roachpb.BatchRequest,
+	args *roachpb.BatchRequest,
 	rpcContext *rpc.Context,
 ) (*roachpb.BatchResponse, error) {
 	var ambiguousError error
