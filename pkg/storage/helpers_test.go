@@ -74,7 +74,13 @@ func (s *Store) ComputeMVCCStats() (enginepb.MVCCStats, error) {
 
 func forceScanAndProcess(s *Store, q *baseQueue) {
 	newStoreReplicaVisitor(s).Visit(func(repl *Replica) bool {
-		q.MaybeAdd(repl, s.cfg.Clock.Now())
+		//q.MaybeAdd(repl, s.cfg.Clock.Now())
+		q.mu.Lock()
+		disabled := q.mu.disabled
+		q.mu.disabled = false
+		q.maybeAddLocked(context.Background(), repl, s.cfg.Clock.Now())
+		q.mu.disabled = disabled
+		q.mu.Unlock()
 		return true
 	})
 

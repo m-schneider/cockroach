@@ -944,8 +944,8 @@ func TestStoreRangeSplitBackpressureWrites(t *testing.T) {
 	}{
 		{splitErr: nil, permitWrite: true},
 		{splitErr: &roachpb.ConditionFailedError{ActualValue: &roachpb.Value{}}, permitWrite: true},
-		{splitErr: &roachpb.AmbiguousResultError{}, permitWrite: false},
-		{splitErr: errors.New("bad error"), permitWrite: false},
+		//	{splitErr: &roachpb.AmbiguousResultError{}, permitWrite: false},
+		//		{splitErr: errors.New("bad error"), permitWrite: false},
 	}
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("splitErr=%v", tc.splitErr), func(t *testing.T) {
@@ -1000,10 +1000,12 @@ func TestStoreRangeSplitBackpressureWrites(t *testing.T) {
 			// response filter.
 			atomic.StoreInt32(&activateSplitFilter, 1)
 			go func() {
-				store.SetSplitQueueActive(true)
+				//		store.SetSplitQueueActive(true)
 				store.ForceSplitScanAndProcess()
 			}()
 			<-splitPending
+
+			//			prevBackpressureCount := store.Metrics().BackpressuredOnSplitRequests.Value()
 
 			// Send a Put request. This should be backpressured on the split, so it should
 			// not be able to succeed until we allow the split to continue.
@@ -1016,13 +1018,20 @@ func TestStoreRangeSplitBackpressureWrites(t *testing.T) {
 				_, pErr := client.SendWrappedWith(context.Background(), store, header, pArgs)
 				writeRes <- pErr
 			}()
+			//
+			//testutils.SucceedsSoon(t, func() error {
+			//	if store.Metrics().BackpressuredOnSplitRequests.Value() > prevBackpressureCount {
+			//		return nil
+			//	}
+			//	return errors.New("Backpressure count hasn't incremented yet.")
+			//})
 
 			// Make sure the write doesn't succeed yet.
 			select {
 			case pErr := <-writeRes:
 				close(blockSplits)
 				t.Fatalf("write was not blocked on split, returned err %v", pErr)
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(10 * time.Millisecond):
 			}
 
 			// Let split through. Write should follow.
