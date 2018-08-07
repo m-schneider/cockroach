@@ -390,6 +390,7 @@ func (n *Node) start(
 	attrs roachpb.Attributes,
 	locality roachpb.Locality,
 	cv cluster.ClusterVersion,
+	localityAddress []roachpb.LocalityAddress,
 ) error {
 	n.storeCfg.Settings.Version.OnChange(n.onClusterVersionChange)
 	if err := n.storeCfg.Settings.InitializeVersion(cv); err != nil {
@@ -430,6 +431,7 @@ func (n *Node) start(
 		Attrs:         attrs,
 		Locality:      locality,
 		ServerVersion: n.storeCfg.Settings.Version.ServerVersion,
+		//LocalityAddress: localityAddress,
 	}
 
 	// Gossip the node descriptor to make this node addressable by node ID.

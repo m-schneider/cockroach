@@ -156,6 +156,8 @@ type ServerConfig struct {
 	// draining state.
 	Gossip *gossip.Gossip
 
+	NodeDialer *nodedialer.Dialer
+
 	// SessionBoundInternalExecutorFactory is used to construct session-bound
 	// executors. The idea is that a higher-layer binds some of the arguments
 	// required, so that users of ServerConfig don't have to care about them.
@@ -405,7 +407,7 @@ func (ds *ServerImpl) setupFlow(
 		id:             req.Flow.FlowID,
 		EvalCtx:        evalCtx,
 		rpcCtx:         ds.RPCContext,
-		nodeDialer:     nodedialer.New(ds.RPCContext, gossip.AddressResolver(ds.Gossip)),
+		nodeDialer:     ds.NodeDialer,
 		gossip:         ds.Gossip,
 		txn:            txn,
 		clientDB:       ds.DB,

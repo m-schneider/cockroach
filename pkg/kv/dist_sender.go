@@ -186,6 +186,8 @@ type DistSenderConfig struct {
 	RPCContext        *rpc.Context
 	RangeDescriptorDB RangeDescriptorDB
 
+	NodeDialer *nodedialer.Dialer
+
 	TestingKnobs ClientTestingKnobs
 }
 
@@ -195,10 +197,11 @@ type DistSenderConfig struct {
 // defaults will be used.
 func NewDistSender(cfg DistSenderConfig, g *gossip.Gossip) *DistSender {
 	ds := &DistSender{
-		st:      cfg.Settings,
-		clock:   cfg.Clock,
-		gossip:  g,
-		metrics: makeDistSenderMetrics(),
+		st:         cfg.Settings,
+		clock:      cfg.Clock,
+		gossip:     g,
+		metrics:    makeDistSenderMetrics(),
+		nodeDialer: cfg.NodeDialer,
 	}
 	if ds.st == nil {
 		ds.st = cluster.MakeTestingClusterSettings()
@@ -236,7 +239,7 @@ func NewDistSender(cfg DistSenderConfig, g *gossip.Gossip) *DistSender {
 			ds.rpcRetryOptions.Closer = ds.rpcContext.Stopper.ShouldQuiesce()
 		}
 	}
-	ds.nodeDialer = nodedialer.New(ds.rpcContext, gossip.AddressResolver(g))
+	ds.nodeDialer = cfg.NodeDialer
 	ds.asyncSenderSem = make(chan struct{}, defaultSenderConcurrency)
 
 	if g != nil {

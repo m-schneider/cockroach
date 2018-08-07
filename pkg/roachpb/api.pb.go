@@ -182,6 +182,7 @@
 		Percentiles
 		StoreCapacity
 		NodeDescriptor
+		LocalityAddress
 		StoreDescriptor
 		StoreDeadReplicas
 		Locality

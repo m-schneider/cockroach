@@ -266,6 +266,8 @@ type Gossip struct {
 	// node ID to enable faster node lookup by address.
 	resolverAddrs  map[util.UnresolvedAddr]resolver.Resolver
 	bootstrapAddrs map[util.UnresolvedAddr]roachpb.NodeID
+
+	locality roachpb.Locality
 }
 
 // New creates an instance of a gossip node.
@@ -287,6 +289,7 @@ func New(
 	grpcServer *grpc.Server,
 	stopper *stop.Stopper,
 	registry *metric.Registry,
+	locality roachpb.Locality,
 ) *Gossip {
 	ambient.SetEventLog("gossip", "gossip")
 	g := &Gossip{
@@ -305,6 +308,7 @@ func New(
 		storeMap:          make(map[roachpb.StoreID]roachpb.NodeID),
 		resolverAddrs:     map[util.UnresolvedAddr]resolver.Resolver{},
 		bootstrapAddrs:    map[util.UnresolvedAddr]roachpb.NodeID{},
+		locality:          locality,
 	}
 	stopper.AddCloser(stop.CloserFn(g.server.AmbientContext.FinishEventLog))
 
@@ -345,7 +349,7 @@ func NewTest(
 	n := &base.NodeIDContainer{}
 	var ac log.AmbientContext
 	ac.AddLogTag("n", n)
-	gossip := New(ac, c, n, rpcContext, grpcServer, stopper, registry)
+	gossip := New(ac, c, n, rpcContext, grpcServer, stopper, registry, roachpb.Locality{})
 	if nodeID != 0 {
 		n.Set(context.TODO(), nodeID)
 	}
