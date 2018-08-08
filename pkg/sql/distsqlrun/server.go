@@ -407,7 +407,7 @@ func (ds *ServerImpl) setupFlow(
 		id:             req.Flow.FlowID,
 		EvalCtx:        evalCtx,
 		rpcCtx:         ds.RPCContext,
-		nodeDialer:     ds.NodeDialer,
+		nodeDialer:     nodedialer.New(ds.RPCContext, gossip.AddressResolver(ds.Gossip)),
 		gossip:         ds.Gossip,
 		txn:            txn,
 		clientDB:       ds.DB,

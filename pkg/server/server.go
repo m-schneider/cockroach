@@ -241,7 +241,6 @@ func NewServer(cfg Config, stopper *stop.Stopper) (*Server, error) {
 		s.grpc,
 		s.stopper,
 		s.registry,
-		s.cfg.Locality,
 	)
 	s.nodeDialer = nodedialer.New(s.rpcContext, gossip.AddressResolver(s.gossip))
 
